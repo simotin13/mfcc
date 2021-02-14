@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    result = generate_binary("./build/tmp.S", program, TARGET_RISC_V);
+    result = generate_binary("tmp.s", program, TARGET_X86_64);
     if (result < 0) {
         fprintf(stderr, "generate_binary failed.\n");
         exit(1);
