@@ -15,5 +15,6 @@ FuncDecl *func_decl_new(char *name, Variable *ret, Vector *args)
 FuncBody* func_body_new()
 {
     FuncBody* funcBody = malloc(sizeof(FuncBody));
-    funcBody->scope
+    funcBody->scope = scope_new();
+    return funcBody;
 }

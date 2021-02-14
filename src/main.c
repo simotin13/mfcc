@@ -8,6 +8,7 @@
 #include "gpcc.h"
 #include "vector.h"
 #include "lex.h"
+#include "ast.h"
 #include "parser.h"
 #include "codegen.h"
 
@@ -36,7 +37,7 @@ int main(int argc, char **argv) {
     int result;
     unsigned int len = 0;
     Vector *tokens = vec_new();
-    Program program;
+    Program* program = program_new();
 
     if (argc < 2) {
         fprintf(stderr, "no input files.\n");
@@ -69,14 +70,14 @@ int main(int argc, char **argv) {
         }
         fprintf(stdout, "************ dump token end ************\n");
     }
-#if 0
-    result = parse_tokens(tokens, &program);
+#if 1
+    result = parse_tokens(tokens, program);
     if (result < 0) {
         fprintf(stderr, "parse_tokens failed.\n");
         exit(1);
     }
 
-    result = generate_binary("./build/tmp.S", &program, TARGET_RISC_V);
+    result = generate_binary("./build/tmp.S", program, TARGET_RISC_V);
     if (result < 0) {
         fprintf(stderr, "generate_binary failed.\n");
         exit(1);

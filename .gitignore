@@ -1,4 +1,7 @@
 *.obj
 *.pdb
 *.log
+*.tlog
+vs2019/*/Debug/*
+vs2019/.vs/*
 

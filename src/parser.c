@@ -16,33 +16,21 @@ typedef enum {
     DECL_TYPE_FUNCTION_BODY,
 } DeclType;
 
-typedef struct {
-    Scope scope;
-    unsigned int ptr;
-    char sym[STRING_MAX];
-} VarInfo;
-
-typedef struct {
-    char name[STRING_MAX];
-    Type retType;
-    Vector* args;
-    Vector* nodes;
-} FuncInfo;
-
 // ============================================================================
 // prototype functions
 // ============================================================================
-static Program *parse_toplevel(int *ec);
-static int parse_declare_specifier(DeclType *declType, void *decl);
+static int parse_toplevel(Program* program);
+static int parse_declare_specifier(DeclType *declType, void **decl);
 static int parse_function_args(Vector *args);
-static int parse_function_body(FuncDecl* func);
+static int parse_function_body(FuncDecl* func, FuncBody* funcBody);
 static int parse_variable(Variable* var);
+static Integer* ast_int_new(long val);
+static int get_return_stmt(Token* t, Variable* var, StmtReturn** stmtReturn);
 
 static void initialzize_types(void);
 static Token* cur_token();
-static bool is_type_of(Token *t, Type *types, int len);
+static bool is_type_of(Token *t, Type *types, int len, Type **type);
 static bool is_token_type(Token* t, TokenType tokenType);
-static bool is_literal_or_of(Token *t, Variable *var);
 static bool is_c_types(Token* t);
 static Token *consume(void);
 static void error_unexpected_token(TokenType expected);
@@ -69,8 +57,8 @@ static int s_types_len;
 
 int parse_tokens(Vector *tokens, Program *program)
 {
-    int ec;
     int i;
+    int result;
     Token* token;
 
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
@@ -87,10 +75,10 @@ int parse_tokens(Vector *tokens, Program *program)
 
     s_token_pos = 0;
     s_token_len = tokens->size;
-    program = parse_toplevel(&ec);
+    result = parse_toplevel(program);
 
     DPRINT(stdout, "%s:%d out...\n", __FUNCTION__, __LINE__);
-    return ec;
+    return result;
 }
 
 static void initialzize_types(void)
@@ -104,19 +92,19 @@ static void initialzize_types(void)
     return;
 }
 
-static Program *parse_toplevel(int *ec)
+static int parse_toplevel(Program* program)
 {
     int result = 0;
-    Program *program;
     DeclType declType;
-    FuncDecl* func = NULL;
+    Func* func = NULL;
+    FuncDecl* funcDecl = NULL;
     FuncBody* funcBody = NULL;
     void* decl = NULL;
 
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
 
     while(s_token_pos < s_token_len) {
-        result = parse_declare_specifier(&declType, decl);
+        result = parse_declare_specifier(&declType, &decl);
         if (result != 0) {
             return -1;
         }
@@ -125,11 +113,14 @@ static Program *parse_toplevel(int *ec)
         } else if (declType == DECL_TYPE_FUNCTION_PROTOTYPE) {
             // TODO
         } else if (declType == DECL_TYPE_FUNCTION_BODY) {
-            func = decl;
-            result = parse_function_body(func, funcBody);
+            funcDecl = decl;
+            funcBody = func_body_new();
+            result = parse_function_body(funcDecl, funcBody);
             if (result != 0) {
                 return -1;
             }
+            func = func_new(funcDecl, funcBody);
+            vec_push_back(program->funcs, func);
         }
         #if 0
         result = declare_function(&varInfo);
@@ -147,10 +138,10 @@ static Program *parse_toplevel(int *ec)
     DPRINT(stdout, "%s:%d out...\n", __FUNCTION__, __LINE__);
 
     // TODO
-    return NULL;
+    return 0;
 }
 
-static int parse_declare_specifier(DeclType *declType, void *decl) {
+static int parse_declare_specifier(DeclType *declType, void **decl) {
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
     bool bResult;
     int result;
@@ -159,14 +150,15 @@ static int parse_declare_specifier(DeclType *declType, void *decl) {
     Variable* var;
     Vector* vars;
     FuncDecl *funcDecl;
+    Type* type;
     vars = vec_new();
 
     t = cur_token();
-    bResult = is_type_of(t, s_types, s_types_len);
+    bResult = is_type_of(t, s_types, s_types_len, &type);
     if (bResult != true) {
         return -1;
     }
-    var = variable_new(t->val, t->type, 0);
+    var = variable_new(type, 0);
 
     sym = consume();
     bResult = is_token_type(sym, T_IDENTIFIER);
@@ -189,9 +181,10 @@ static int parse_declare_specifier(DeclType *declType, void *decl) {
         bResult = is_token_type(t, T_OPEN_BRACE);
         if (bResult) {
             // should be function body
+            consume();
             funcDecl = func_decl_new(sym->val, var, vars);
             *declType = DECL_TYPE_FUNCTION_BODY;
-            decl = funcDecl;
+            *decl = funcDecl;
             return 0;
 
         }
@@ -199,7 +192,7 @@ static int parse_declare_specifier(DeclType *declType, void *decl) {
         if (bResult) {
             funcDecl = func_decl_new(sym->val, var, vars);
             *declType = DECL_TYPE_FUNCTION_PROTOTYPE;
-            decl = funcDecl;
+            *decl = funcDecl;
             return 0;
         }
     } else {
@@ -212,8 +205,8 @@ static int parse_declare_specifier(DeclType *declType, void *decl) {
         result = is_token_type(t, T_SEMICOLON);
         if (result) {
             // var delare;
-            declType = DECL_TYPE_VAR;
-            decl = var;
+            *declType = DECL_TYPE_VAR;
+            *decl = var;
             return 0;
         }
     }
@@ -255,19 +248,18 @@ static int parse_function_args(Vector *vars)
     return 0;
 }
 
-static int parse_function_body(FuncDecl* func, FuncBody *funcBody) {
+static int parse_function_body(FuncDecl* func, FuncBody *funcBody)
+{
     bool bResult;
     int result;
     Token* t = cur_token();
-    Variable* var;
-    void* ast;
-    Scope* scope;
+    Stmt* stmt;
+    StmtReturn* stmtReturn;
 
-    scope = scope_new();
-    funcBody = func_body_new();
     while (true) {
         bResult = is_token_type(t, T_CLOSE_BRACE);
         if (bResult) {
+            consume();
             break;
         }
 
@@ -275,39 +267,42 @@ static int parse_function_body(FuncDecl* func, FuncBody *funcBody) {
         bResult = is_token_type(t, T_RETURN);
         if (bResult) {
             t = consume();
-            result = get_return_var(t, func->ret, ast);
+            result = get_return_stmt(t, func->ret, &stmtReturn);
             if (result != 0) {
                 return -1;
             }
-            scope_add_stmt(ast);
-            funcBody
+            stmt = stmt_new(STMT_TYPE_RETURN, stmtReturn);
+            scope_add_stmt(funcBody->scope, stmt);
         }
         t = consume();
     }
     return 0;
 }
 
-typedef struct {
-    long val;
-} AstInteger;
-
-static AstInteger *ast_int_new(long val)
+static Integer *ast_int_new(long val)
 {
-    AstInteger *ast = malloc(sizeof(AstInteger));
+    Integer *ast = malloc(sizeof(Integer));
     ast->val = val;
     return ast;
 }
 
-static int get_return_var(Token *t, Variable* var, void *ast)
+static int get_return_stmt(Token *t, Variable* var, StmtReturn **stmtReturn)
 {
     long val;
     char* endptr;
     int result = 0;
-
+    Integer* astInt;
+    Token *tmp;
+    bool bResult;
     if (t->type == T_INTEGER) {
-        val = strtol(t->val, &endptr, 10);
-        ast = ast_int_new(val);
-        return result;
+        tmp = consume();
+        bResult = is_token_type(tmp, T_SEMICOLON);
+        if (bResult) {
+            val = strtol(t->val, &endptr, 10);
+            astInt = ast_int_new(val);
+            *stmtReturn = stmt_new_stmt_return(t, astInt);
+            return 0;
+        }
     }
 
     return -1;
@@ -316,11 +311,11 @@ static int get_return_var(Token *t, Variable* var, void *ast)
 static int parse_variable(Variable *var)
 {
     bool bResult;
-    int result;
     Token* t;
+    Type* type;
 
     t = cur_token();
-    bResult = is_type_of(t, s_types, s_types_len);
+    bResult = is_type_of(t, s_types, s_types_len, &type);
     if (bResult != true) {
         return -1;
     }
@@ -337,16 +332,17 @@ static int parse_variable(Variable *var)
     }
 
     t = consume();
-    var = variable_new(0, t->type, t->val);
+    var = variable_new(type, 0);
     return 0;
 }
 
-static bool is_type_of(Token *t, Type *types, int len)
+static bool is_type_of(Token *t, Type *types, int len, Type **type)
 {
     int i;
     bool bResult = false;
     for (i = 0; i < len; i++) {
         if (strcmp(t->val, types[i].name) == 0) {
+            *type = &types[i];
             bResult = true;
         }
     }
@@ -360,17 +356,6 @@ static bool is_token_type(Token* t, TokenType tokenType)
         bResult = true;
     }
     return bResult;
-}
-static bool is_literal_or_of(Token* t, Variable* var)
-{
-    bool bResult;
-    switch (t->type) {
-        case T_INTEGER:
-            break;
-        default:
-            break;
-    }
-    return true;
 }
 
 static bool is_c_types(Token* t)
@@ -399,42 +384,6 @@ static Token *consume()
         return NULL;
     }
     return &s_tokens[s_token_pos];
-}
-
-static int declare_specifier(VarInfo *decl)
-{
-    Token *t = NULL;
-    decl->scope = SCOPE_STATIC;
-    decl->ptr = 0;
-
-    DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
-#if 0
-    t = consume(T_IDENTIFIER);
-    if (!t) {
-        error_unexpected_token(T_IDENTIFIER);
-        return -1;
-    }
-    strncpy(decl->sym, t->val, STRING_MAX);
-    decl->sym[STRING_MAX -1] = '\0';
-
-    // initialize
-    if (consume(T_EQUAL)) {
-        t = consume(T_INTEGER);
-        if (!t) {
-            error_unexpected_token(T_INTEGER);
-            return -1;
-        }
-        decl->dt = DtInt;
-    }
-
-    t = consume(T_SEMICOLON);
-    if (!t) {
-        error_unexpected_token(T_SEMICOLON);
-        return -1;
-    }
-#endif
-	DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
-    return 0;
 }
 
 static void error_unexpected_token(TokenType expected)
