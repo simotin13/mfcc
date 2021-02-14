@@ -1,0 +1,2 @@
+C:\Users\miyazaki\Desktop\gpcc-master\vs2019\x64\Debug\gpcc.exe
+C:\Users\miyazaki\Desktop\gpcc-master\vs2019\x64\Debug\gpcc.pdb
