@@ -3,6 +3,10 @@
 #include <sys/stat.h>
 #include "codegen.h"
 
+#if defined(_WIN64) || defined(_WIN32)
+#include <direct.h>
+#endif
+
 static void traverse_program(FILE* fp, Program* prgram);
 static void traverse_stmt(FILE* fp, Stmt* stmt);
 static void traverse_return(FILE* fp, StmtReturn* stmtReturn);
@@ -68,7 +72,7 @@ static void traverse_stmt(FILE* fp, Stmt* stmt)
 {
     switch (stmt->type) {
     case STMT_TYPE_RETURN:
-        traverse_return(fp, (StmtReturn *)stmt);
+        traverse_return(fp, (StmtReturn *)stmt->ast);
         break;
     default:
         break;
@@ -77,12 +81,12 @@ static void traverse_stmt(FILE* fp, Stmt* stmt)
 }
 
 static void traverse_return(FILE *fp, StmtReturn *stmtReturn) {
-    fprintf(fp, "ret ");
     Integer* integer;
     switch (stmtReturn->t->type) {
     case T_INTEGER:
         integer = (Integer *)(stmtReturn->val);
-        fprintf(fp, "%d\n", integer->val);
+        fprintf(fp, "mov eax %d\n", integer->val);
+        fprintf(fp, "ret ");
     default:
         break;
     }

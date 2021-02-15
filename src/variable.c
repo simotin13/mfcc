@@ -7,7 +7,7 @@ Variable *variable_new(Type* ty, int pointer_level)
     Variable* var = NULL;
     var = malloc(sizeof(Variable));
     var->pointer_level = pointer_level;
-    var->ty = ty->hash;
+    var->ty = ty;
     strcpy(var->name, ty->name);
     return var;
 }
