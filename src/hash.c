@@ -50,7 +50,7 @@ static unsigned int hash(char *str)
 {
     int i;
     unsigned int h = 0;
-    int len = strlen(str);
+    size_t len = strlen(str);
     for (i = 0; i < len; i++) {
         h += str[i];
         h = h * 0x3F1B2351;
