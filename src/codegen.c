@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <stdarg.h>
 #include "codegen.h"
 
 #if defined(_WIN64) || defined(_WIN32)
@@ -10,6 +11,10 @@
 static void traverse_program(FILE* fp, Program* prgram);
 static void traverse_stmt(FILE* fp, Stmt* stmt);
 static void traverse_return(FILE* fp, StmtReturn* stmtReturn);
+
+static void write_asm_with_indent(FILE* fp, char* fmt, ...);
+static void write_prologue(FILE* fp);
+static void write_epilogue(FILE* fp);
 
 #define BUILD_DIR   "build"
 
@@ -37,9 +42,8 @@ int generate_binary(char *filename, Program *program, BuildTargetType target)
         exit(1);
     }
 
-    fprintf(fp, ".text\n");
+    fprintf(fp, "section .text\n");
     traverse_program(fp, program);
-    fprintf(fp, ".text\n");
 
     fclose(fp);
 
@@ -58,12 +62,16 @@ static void traverse_program(FILE* fp, Program* program)
     for (i = 0; i < program->funcs->size; i++) {
         func = (Func *)program->funcs->data[i];
         body = func->body;
+        fprintf(fp, "global %s\n", func->decl->name);
+        fprintf(fp, "\n");
         fprintf(fp, "%s:\n", func->decl->name);
+        write_prologue(fp);
         stmts = body->scope->stmts;
         for (j = 0; j < stmts->size; j++) {
             stmt = (Stmt *)stmts->data[i];
             traverse_stmt(fp, stmt);
         }
+        write_epilogue(fp);
     }
     return;
 }
@@ -80,13 +88,37 @@ static void traverse_stmt(FILE* fp, Stmt* stmt)
     return;
 }
 
+static void write_prologue(FILE* fp)
+{
+    write_asm_with_indent(fp, "push rbp");
+    write_asm_with_indent(fp, "mov rbp, rsp");
+    return;
+}
+
+static void write_epilogue(FILE* fp)
+{
+    write_asm_with_indent(fp, "pop rbp");
+    write_asm_with_indent(fp, "ret");
+    return;
+}
+
+static void write_asm_with_indent(FILE* fp, char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    fprintf(fp, "\t");
+    vfprintf(fp, fmt, args);
+    fprintf(fp, "\n");
+    va_end(args);
+    return;
+}
+
 static void traverse_return(FILE *fp, StmtReturn *stmtReturn) {
     Integer* integer;
     switch (stmtReturn->t->type) {
     case T_INTEGER:
         integer = (Integer *)(stmtReturn->val);
-        fprintf(fp, "mov eax %d\n", integer->val);
-        fprintf(fp, "ret ");
+        write_asm_with_indent(fp, "mov eax, %d", integer->val);
     default:
         break;
     }
