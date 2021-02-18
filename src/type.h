@@ -3,6 +3,7 @@
 
 typedef struct {
     int hash;
+    int size;
     char name[256];
 } Type;
 

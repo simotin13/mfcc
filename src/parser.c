@@ -27,11 +27,9 @@ static int parse_variable(Variable* var);
 static Integer* ast_int_new(long val);
 static int get_return_stmt(Token* t, Variable* var, StmtReturn** stmtReturn);
 
-static void initialzize_types(void);
 static Token* cur_token();
-static bool is_type_of(Token *t, Type *types, int len, Type **type);
+static bool is_type_of(Token *t, Vector *types, Type **type);
 static bool is_token_type(Token* t, TokenType tokenType);
-static bool is_c_types(Token* t);
 static Token *consume(void);
 static void error_unexpected_token(TokenType expected);
 
@@ -39,33 +37,16 @@ static void error_unexpected_token(TokenType expected);
 static Token* s_tokens = NULL;
 static int s_token_pos = 0;
 static int s_token_len = 0;
+static Vector* s_types;
 
-// types info
-static const Type c_types[] =
-{
-    {   0,  "void"   },
-    {   1,  "char"     },
-    {   2,  "short"    },
-    {   3,  "int"      },
-    {   4,  "long"     },
-    {   5,  "float"    },
-    {   6,  "double"   },
-};
-#define C_TYPES_LEN     (7)
-Type* s_types = NULL;
-static int s_types_len;
-
-int parse_tokens(Vector *tokens, Program *program)
+int parse_tokens(Vector *tokens, Vector *dataTypes, Program *program)
 {
     int i;
     int result;
     Token* token;
 
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
-    
-    // initialize types info
-    initialzize_types();
-    
+        
     // copy tokens
     s_tokens = malloc(sizeof(Token) * tokens->size);
     for (i = 0; i < tokens->size; i++) {
@@ -75,22 +56,13 @@ int parse_tokens(Vector *tokens, Program *program)
 
     s_token_pos = 0;
     s_token_len = tokens->size;
+    s_types = dataTypes;
     result = parse_toplevel(program);
 
     DPRINT(stdout, "%s:%d out...\n", __FUNCTION__, __LINE__);
     return result;
 }
 
-static void initialzize_types(void)
-{
-    int i;
-    s_types = malloc(sizeof(Type) * C_TYPES_LEN);
-    for (i = 0; i < C_TYPES_LEN; i++) {
-        memcpy(&s_types[i], &c_types[i], sizeof(Type));
-    }
-    s_types_len = C_TYPES_LEN;
-    return;
-}
 
 static int parse_toplevel(Program* program)
 {
@@ -120,7 +92,7 @@ static int parse_toplevel(Program* program)
                 return -1;
             }
             func = func_new(funcDecl, funcBody);
-            vec_push_back(program->funcs, func);
+            vec_push(program->funcs, func);
         }
         #if 0
         result = declare_function(&varInfo);
@@ -154,7 +126,7 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
     vars = vec_new();
 
     t = cur_token();
-    bResult = is_type_of(t, s_types, s_types_len, &type);
+    bResult = is_type_of(t, s_types, &type);
     if (bResult != true) {
         return -1;
     }
@@ -223,7 +195,7 @@ static int parse_function_args(Vector *vars)
 
     t = cur_token();
     Variable* variable = NULL;
-    while (1) {
+    while (true) {
         bResult = is_token_type(t, T_CLOSE_PAREN);
         if (bResult) {
             break;
@@ -232,13 +204,13 @@ static int parse_function_args(Vector *vars)
         if (result != 0) {
             return -1;
         }
-        t = consume();
 
         if (variable != NULL) {
-            vec_push_back(vars, variable);
+            vec_push(vars, variable);
         }
 
         // skip comma
+        t = consume();
         bResult = is_token_type(t, T_COMMA);
         if (bResult) {
             t = consume();
@@ -315,10 +287,12 @@ static int parse_variable(Variable *var)
     Type* type;
 
     t = cur_token();
-    bResult = is_type_of(t, s_types, s_types_len, &type);
+    bResult = is_type_of(t, s_types, &type);
     if (bResult != true) {
         return -1;
     }
+
+    // void doesn't hava identifier
     bResult = is_token_type(t, T_VOID);
     if (bResult) {
         var = NULL;
@@ -331,18 +305,19 @@ static int parse_variable(Variable *var)
         return -1;
     }
 
-    t = consume();
     var = variable_new(type, 0);
     return 0;
 }
 
-static bool is_type_of(Token *t, Type *types, int len, Type **type)
+static bool is_type_of(Token *t, Vector *types, Type **type)
 {
     int i;
     bool bResult = false;
-    for (i = 0; i < len; i++) {
-        if (strcmp(t->val, types[i].name) == 0) {
-            *type = &types[i];
+    Type* ty;
+    for (i = 0; i < types->size; i++) {
+        ty = (Type *)types->data[i];
+        if (strcmp(t->val, ty->name) == 0) {
+            *type = types->data[i];
             bResult = true;
         }
     }
@@ -356,20 +331,6 @@ static bool is_token_type(Token* t, TokenType tokenType)
         bResult = true;
     }
     return bResult;
-}
-
-static bool is_c_types(Token* t)
-{
-    int i = 0;
-    int ret;
-    for (i = 0; i < C_TYPES_LEN; i++)
-    {
-        ret = strcmp(t->val, c_types[i].name);
-        if (ret == 0) {
-            return true;
-        }
-    }
-    return false;
 }
 
 static Token* cur_token()

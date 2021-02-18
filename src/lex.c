@@ -81,7 +81,7 @@ int tokenize(char *code, unsigned int len, Vector *tokens)
 
         token = get_token(pos, &leftLen, &nextpos, &result);
         if (result == 0) {
-            vec_push_back(tokens, token);
+            vec_push(tokens, token);
             pos = nextpos;
         }
     }

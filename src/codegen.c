@@ -2,23 +2,26 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <stdarg.h>
+#include <string.h>
+
 #include "codegen.h"
 
 #if defined(_WIN64) || defined(_WIN32)
 #include <direct.h>
 #endif
 
-static void traverse_program(FILE* fp, Program* prgram);
-static void traverse_stmt(FILE* fp, Stmt* stmt);
+static void traverse_program(FILE* fp, Vector *dataTypes, Program* prgram);
+static void traverse_stmt(FILE* fp, Vector *dataTypes, Stmt* stmt);
 static void traverse_return(FILE* fp, StmtReturn* stmtReturn);
 
 static void write_asm_with_indent(FILE* fp, char* fmt, ...);
 static void write_prologue(FILE* fp);
 static void write_epilogue(FILE* fp);
+static void write_function_args(FILE* fp, Vector *dataTypes, Func* func);
 
 #define BUILD_DIR   "build"
 
-int generate_binary(char *filename, Program *program, BuildTargetType target)
+int generate_binary(char *filename, Vector* types, Program *program, BuildTargetType target)
 {
     FILE *fp;
     struct stat st;
@@ -43,7 +46,7 @@ int generate_binary(char *filename, Program *program, BuildTargetType target)
     }
 
     fprintf(fp, "section .text\n");
-    traverse_program(fp, program);
+    traverse_program(fp, types, program);
 
     fclose(fp);
 
@@ -51,7 +54,7 @@ int generate_binary(char *filename, Program *program, BuildTargetType target)
     return 0;
 }
 
-static void traverse_program(FILE* fp, Program* program)
+static void traverse_program(FILE* fp, Vector *dataTypes, Program* program)
 {
     int i, j;
     Func* func;
@@ -66,17 +69,18 @@ static void traverse_program(FILE* fp, Program* program)
         fprintf(fp, "\n");
         fprintf(fp, "%s:\n", func->decl->name);
         write_prologue(fp);
+        write_function_args(fp, dataTypes, func);
         stmts = body->scope->stmts;
         for (j = 0; j < stmts->size; j++) {
             stmt = (Stmt *)stmts->data[i];
-            traverse_stmt(fp, stmt);
+            traverse_stmt(fp, dataTypes, stmt);
         }
         write_epilogue(fp);
     }
     return;
 }
 
-static void traverse_stmt(FILE* fp, Stmt* stmt)
+static void traverse_stmt(FILE* fp, Vector *dataTypes, Stmt* stmt)
 {
     switch (stmt->type) {
     case STMT_TYPE_RETURN:
@@ -100,6 +104,30 @@ static void write_epilogue(FILE* fp)
     write_asm_with_indent(fp, "pop rbp");
     write_asm_with_indent(fp, "ret");
     return;
+}
+
+static void write_function_args(FILE* fp, Vector *dataTypes, Func* func)
+{
+    int i;
+    Variable* arg;
+    for (i = 0; i < func->decl->args->size; i++) {
+        arg = func->decl->args->data[i];
+        arg->ty;
+    }
+    return;
+}
+static int get_data_type_size(Type *ty, Vector* dataTypes)
+{
+    int i;
+    Type* tmp;
+    for (i = 0; i < dataTypes->size; i++) {
+        tmp = dataTypes->data[i];
+        if (strcmp(ty->name, tmp->name)) {
+            return tmp->size;
+        }
+    }
+
+    return 0;
 }
 
 static void write_asm_with_indent(FILE* fp, char *fmt, ...)

@@ -27,7 +27,7 @@ void vec_copy(Vector *dst, Vector *src)
     return;
 }
 
-int vec_push_back(Vector *v, void *data)
+int vec_push(Vector *v, void *data)
 {
     if (v->capacity == v->size) {
         v->data = realloc(v->data, sizeof(void *) * v->capacity * 2);

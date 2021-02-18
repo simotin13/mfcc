@@ -21,7 +21,7 @@ Stmt* stmt_new(StatementType type, void* ast)
 
 void scope_add_stmt(Scope* scope, Stmt* stmt)
 {
-    vec_push_back(scope->stmts, stmt);
+    vec_push(scope->stmts, stmt);
 }
 
 Func* func_new(FuncDecl* decl, FuncBody* body)

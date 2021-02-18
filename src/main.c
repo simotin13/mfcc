@@ -13,8 +13,17 @@
 #include "codegen.h"
 
 // ============================================================================
+// define
+// ============================================================================
+#define C_TYPES_LEN     (7)
+
+// ============================================================================
 // struct define
 // ============================================================================
+typedef struct {
+    Type* types;
+    int len;
+} DataTypes;
 
 // ============================================================================
 // enum define
@@ -26,9 +35,19 @@
 static int read_file(char *filepath, unsigned int *len);
 
 // ============================================================================
-// global variable
+// static variables
 // ============================================================================
 static char s_code[CODE_LEN_MAX];
+static const Type c_types[] =
+{
+    {   0,  0,  "void"      },
+    {   sizeof(char),  1,  "char"      },
+    {   sizeof(short),  2,  "short"     },
+    {   sizeof(int),  3,  "int"       },
+    {   sizeof(long),  4,  "long"      },
+    {   sizeof(float),  5,  "float"     },
+    {   sizeof(double),  6,  "double"    },
+};
 
 // ============================================================================
 // main
@@ -36,12 +55,22 @@ static char s_code[CODE_LEN_MAX];
 int main(int argc, char **argv) {
     int result;
     unsigned int len = 0;
-    Vector *tokens = vec_new();
-    Program* program = program_new();
+    Vector* tokens;
+    Program* program;
+    Vector* dataTypes;
+
+    int i;
 
     if (argc < 2) {
         fprintf(stderr, "no input files.\n");
         exit(1);
+    }
+
+    tokens = vec_new();
+    program = program_new();
+    dataTypes = vec_new();
+    for (i = 0; i < C_TYPES_LEN; i++) {
+        vec_push(dataTypes, &c_types[i]);
     }
 
     result = read_file(argv[1], &len);
@@ -56,6 +85,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+#if 1
     // ====================================================
     // DEBUG dump tokens
     // ====================================================
@@ -70,19 +100,19 @@ int main(int argc, char **argv) {
         }
         fprintf(stdout, "************ dump token end ************\n");
     }
-#if 1
-    result = parse_tokens(tokens, program);
+#endif
+
+    result = parse_tokens(tokens, dataTypes, program);
     if (result < 0) {
         fprintf(stderr, "parse_tokens failed.\n");
         exit(1);
     }
 
-    result = generate_binary("tmp.s", program, TARGET_X86_64);
+    result = generate_binary("tmp.s", dataTypes, program, TARGET_X86_64);
     if (result < 0) {
         fprintf(stderr, "generate_binary failed.\n");
         exit(1);
     }
-#endif
 
     return 0;
 }

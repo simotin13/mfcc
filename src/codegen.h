@@ -15,6 +15,6 @@
 // ============================================================================
 // prototype functions
 // ============================================================================
-int generate_binary(char *filepath, Program *root, BuildTargetType target);
+int generate_binary(char *filepath, Vector *dataTypes, Program *root, BuildTargetType target);
 
 #endif  // __CODEGEN_H__
