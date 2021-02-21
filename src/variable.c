@@ -9,5 +9,6 @@ Variable *variable_new(char *name, Type* ty, int pointer_level)
     strcpy(var->name, name);
     var->pointer_level = pointer_level;
     var->ty = ty;
+    var->iVal = NULL;
     return var;
 }

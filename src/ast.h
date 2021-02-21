@@ -7,6 +7,13 @@
 // ============================================================================
 // struct define
 // ============================================================================
+typedef enum {
+    ExpInteger,
+} ExpType;
+
+// ============================================================================
+// struct define
+// ============================================================================
 typedef struct {
     Vector *vars;
     Vector *funcs;
@@ -37,18 +44,28 @@ typedef enum {
 } StatementType;
 
 typedef struct {
-    long val;
+    int val;
 } Integer;
 
 typedef struct {
     Token* t;
     void* val;
-}StmtReturn;
+} StmtReturn;
 
 typedef struct {
     StatementType type;
     void* ast;
-}Stmt;
+} Stmt;
+
+typedef struct {
+    ExpType type;
+    void* val;
+} Expression;
+
+typedef struct {
+    Variable* lhs;
+    Expression* rhs;
+} AssignStmt;
 
 extern Program* program_new();
 extern Stmt *stmt_new(StatementType type, void* ast);

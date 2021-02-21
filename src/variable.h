@@ -6,6 +6,7 @@ typedef struct {
     int pointer_level;
     Type *ty;
     char name[256];
+    void* iVal;
 } Variable;
 
 extern Variable* variable_new(char* name, Type* ty, int pointer_level);
