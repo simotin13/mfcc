@@ -1,0 +1,1 @@
+nasm -f elf64 tmp.s
