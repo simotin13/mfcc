@@ -36,8 +36,8 @@ static void traverse_return(FILE* fp, FuncBody *funcBody, StmtReturn* stmtReturn
 
 static void write_asm_with_indent(FILE* fp, char* fmt, ...);
 static void write_prologue(FILE* fp);
-static void write_epilogue(FILE* fp);
-static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars);
+static void write_epilogue(FILE* fp, int frameSize);
+static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *allocSize);
 static void write_initial_value(FILE* fp, Vector* dataTypes, Vector* vars, Variable* var);
 
 static int get_rbp_offset_var(Vector* vars, Variable* var, int* offset);
@@ -101,6 +101,7 @@ static void traverse_program(FILE* fp, Vector *dataTypes, Program* program)
     FuncBody* funcBody;
     Vector* stmts;
     Stmt* stmt;
+    int allocSize;
 
     for (i = 0; i < program->funcs->size; i++) {
         func = (Func *)program->funcs->data[i];
@@ -109,13 +110,13 @@ static void traverse_program(FILE* fp, Vector *dataTypes, Program* program)
         fprintf(fp, "\n");
         fprintf(fp, "%s:\n", func->decl->name);
         write_prologue(fp);
-        write_local_vars(fp, dataTypes, func->body->scope->vars);
+        write_local_vars(fp, dataTypes, func->body->scope->vars, &allocSize);
         stmts = funcBody->scope->stmts;
         for (j = 0; j < stmts->size; j++) {
             stmt = (Stmt *)stmts->data[i];
             traverse_stmt(fp, funcBody, dataTypes, stmt);
         }
-        write_epilogue(fp);
+        write_epilogue(fp, allocSize);
     }
     return;
 }
@@ -139,8 +140,10 @@ static void write_prologue(FILE* fp)
     return;
 }
 
-static void write_epilogue(FILE* fp)
+static void write_epilogue(FILE* fp, int frameSize)
 {
+    write_asm_with_indent(fp, "add esp, 0x%d", frameSize);
+    write_asm_with_indent(fp, "mov rsp, rbp");
     write_asm_with_indent(fp, "pop rbp");
     write_asm_with_indent(fp, "ret");
     return;
@@ -171,19 +174,21 @@ static void write_function_args(FILE* fp, Vector *dataTypes, Func* func)
     return;
 }
 
-static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars)
+static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *allocSize)
 {
     int i;
-    int alloc_stack_size = 0;
     Variable* var;
+
+    *allocSize = 0;
+
     for (i = 0; i < vars->size; i++) {
         var = vars->data[i];
-        alloc_stack_size += get_data_type_size(var->ty, dataTypes);
+        *allocSize += get_data_type_size(var->ty, dataTypes);
     }
 
     // alloc statck
-    if (0 < alloc_stack_size) {
-        write_asm_with_indent(fp, "sub esp, %d", alloc_stack_size);
+    if (0 < allocSize) {
+        write_asm_with_indent(fp, "sub esp, %d", *allocSize);
     }
 
     // variable initialize
@@ -205,7 +210,7 @@ static void write_initial_value(FILE *fp, Vector *dataTypes, Vector *vars, Varia
     if (strcmp(var->ty->name, "int") == 0) {
         get_rbp_offset_var(vars, var, &offset);
         astInt = (Integer *)var->iVal;
-        write_asm_with_indent(fp, "DWORD PTR[rbp - 0x%d], 0x%d", offset, astInt->val);
+        write_asm_with_indent(fp, "mov DWORD [rbp - 0x%d], 0x%d", offset, astInt->val);
     }
 }
 
@@ -250,7 +255,7 @@ static void traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
     {
         astVar = (Variable*)(stmtReturn->val);
         ret = get_rbp_offset_var(body->scope->vars, astVar, &offset);
-        write_asm_with_indent(fp, "mov eax, DWORD PTR [rbp-%d]", offset);
+        write_asm_with_indent(fp, "mov eax, DWORD [rbp-0x%d]", offset);
         break;
     }
     default:
@@ -265,10 +270,10 @@ static int get_rbp_offset_var(Vector* vars, Variable* var, int *offset)
     *offset = 0;
     for (i = 0; i < vars->size; i++) {
         tmp = vars->data[i];
+        *offset -= tmp->ty->size;
         if (strcmp(tmp->name, var->name) == 0) {
             return i;
         }
-        *offset -= tmp->ty->size;
     }
 
     return -1;
