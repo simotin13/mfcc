@@ -8,6 +8,6 @@ typedef struct {
     char name[256];
 } Variable;
 
-extern Variable* variable_new(Type* ty, int pointer_level);
+extern Variable* variable_new(char* name, Type* ty, int pointer_level);
 
 #endif  // _VARIABLE_H_

@@ -14,7 +14,7 @@ typedef struct {
 
 typedef struct {
     char name[256];
-    Variable* ret;
+    Type* retType;
     Vector* args;
 } FuncDecl;
 

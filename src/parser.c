@@ -23,7 +23,8 @@ static int parse_toplevel(Program* program);
 static int parse_declare_specifier(DeclType *declType, void **decl);
 static int parse_function_args(Vector *args);
 static int parse_function_body(FuncDecl* func, FuncBody* funcBody);
-static int parse_variable(Variable* var);
+static int parse_local_variables(FuncBody* funcBody);
+static int parse_variable(Variable** var);
 static Integer* ast_int_new(long val);
 static int get_return_stmt(Token* t, Variable* var, StmtReturn** stmtReturn);
 
@@ -130,7 +131,6 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
     if (bResult != true) {
         return -1;
     }
-    var = variable_new(type, 0);
 
     sym = consume();
     bResult = is_token_type(sym, T_IDENTIFIER);
@@ -141,6 +141,7 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
     t = consume();
     bResult = is_token_type(t, T_OPEN_PAREN);
     if (bResult) {
+
         // should be a function decl or function body
         t = consume();
         vars = vec_new();
@@ -154,7 +155,7 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
         if (bResult) {
             // should be function body
             consume();
-            funcDecl = func_decl_new(sym->val, var, vars);
+            funcDecl = func_decl_new(sym->val, type, vars);
             *declType = DECL_TYPE_FUNCTION_BODY;
             *decl = funcDecl;
             return 0;
@@ -162,7 +163,7 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
         }
         bResult = is_token_type(t, T_SEMICOLON);
         if (bResult) {
-            funcDecl = func_decl_new(sym->val, var, vars);
+            funcDecl = func_decl_new(sym->val, type, vars);
             *declType = DECL_TYPE_FUNCTION_PROTOTYPE;
             *decl = funcDecl;
             return 0;
@@ -178,7 +179,7 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
         if (result) {
             // var delare;
             *declType = DECL_TYPE_VAR;
-            *decl = var;
+            *decl = variable_new(sym->val, type, 0);
             return 0;
         }
     }
@@ -200,7 +201,7 @@ static int parse_function_args(Vector *vars)
         if (bResult) {
             break;
         }
-        result = parse_variable(variable);
+        result = parse_variable(&variable);
         if (result != 0) {
             return -1;
         }
@@ -223,7 +224,7 @@ static int parse_function_args(Vector *vars)
 static int parse_function_body(FuncDecl* func, FuncBody *funcBody)
 {
     bool bResult;
-    int result;
+    int ret;
     Token* t = cur_token();
     Stmt* stmt;
     StmtReturn* stmtReturn;
@@ -235,18 +236,57 @@ static int parse_function_body(FuncDecl* func, FuncBody *funcBody)
             break;
         }
 
+        // check local variable
+        ret = parse_local_variables(funcBody);
+        if (ret < 0) {
+            return -1;
+        }
+
         // check return
+        t = cur_token();
         bResult = is_token_type(t, T_RETURN);
         if (bResult) {
             t = consume();
-            result = get_return_stmt(t, func->ret, &stmtReturn);
-            if (result != 0) {
+            ret = get_return_stmt(t, func->retType, &stmtReturn);
+            if (ret != 0) {
                 return -1;
             }
             stmt = stmt_new(STMT_TYPE_RETURN, stmtReturn);
             scope_add_stmt(funcBody->scope, stmt);
         }
         t = consume();
+    }
+    return 0;
+}
+static int parse_local_variables(FuncBody* funcBody)
+{
+    Token* t = cur_token();
+    Type* type;
+    bool bResult;
+    Variable *var;
+    Token* sym;
+    int ret;
+
+    while (true) {
+        // check exist variable declare
+        t = cur_token();
+        bResult = is_type_of(t, s_types, &type);
+        if (bResult != true) {
+            return funcBody->scope->vars->size;
+        }
+
+        ret = parse_variable(&var);
+        if (ret != 0) {
+            return -1;
+        }
+        t = consume();
+        bResult = is_token_type(t, T_EQUAL);
+        if (bResult) {
+            t = consume();
+            // TODO
+            // get number
+        }
+        vec_push(funcBody->scope->vars, var);
     }
     return 0;
 }
@@ -280,7 +320,7 @@ static int get_return_stmt(Token *t, Variable* var, StmtReturn **stmtReturn)
     return -1;
 }
 
-static int parse_variable(Variable *var)
+static int parse_variable(Variable **var)
 {
     bool bResult;
     Token* t;
@@ -305,7 +345,7 @@ static int parse_variable(Variable *var)
         return -1;
     }
 
-    var = variable_new(type, 0);
+    *var = variable_new(t->val, type, 0);
     return 0;
 }
 

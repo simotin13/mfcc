@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include "gpcc.h"
+#include "type.h"
 #include "vector.h"
 #include "lex.h"
 #include "ast.h"
@@ -15,7 +16,6 @@
 // ============================================================================
 // define
 // ============================================================================
-#define C_TYPES_LEN     (7)
 
 // ============================================================================
 // struct define
@@ -40,13 +40,13 @@ static int read_file(char *filepath, unsigned int *len);
 static char s_code[CODE_LEN_MAX];
 static const Type c_types[] =
 {
-    {   0,  0,  "void"      },
-    {   sizeof(char),  1,  "char"      },
-    {   sizeof(short),  2,  "short"     },
-    {   sizeof(int),  3,  "int"       },
-    {   sizeof(long),  4,  "long"      },
-    {   sizeof(float),  5,  "float"     },
-    {   sizeof(double),  6,  "double"    },
+    {   0,              0,    "void"        },
+    {   1,   sizeof(char),      "char"      },
+    {   2,   sizeof(short),     "short"     },
+    {   3,   sizeof(int),       "int"       },
+    {   4,   sizeof(long),      "long"      },
+    {   5,   sizeof(float),     "float"     },
+    {   6,   sizeof(double),    "double"    },
 };
 
 // ============================================================================
@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
     Vector* tokens;
     Program* program;
     Vector* dataTypes;
+    Type* ty;
 
     int i;
 
@@ -70,7 +71,8 @@ int main(int argc, char **argv) {
     program = program_new();
     dataTypes = vec_new();
     for (i = 0; i < C_TYPES_LEN; i++) {
-        vec_push(dataTypes, &c_types[i]);
+        ty = type_new(c_types[i].name, c_types[i].size);
+        vec_push(dataTypes, ty);
     }
 
     result = read_file(argv[1], &len);

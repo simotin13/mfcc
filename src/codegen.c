@@ -5,10 +5,29 @@
 #include <string.h>
 
 #include "codegen.h"
+#include "type.h"
 
 #if defined(_WIN64) || defined(_WIN32)
 #include <direct.h>
 #endif
+
+// ============================================================================
+// static variables
+// ============================================================================
+static char s_code[CODE_LEN_MAX];
+static const Type c_types[] =
+{
+    {   0,              0,    "void"        },
+    {   1,   sizeof(char),      "char"      },
+    {   2,   sizeof(short),     "short"     },
+    {   3,   sizeof(int),       "int"       },
+    {   4,   sizeof(long),      "long"      },
+    {   5,   sizeof(float),     "float"     },
+    {   6,   sizeof(double),    "double"    },
+};
+
+static void initialize_data_type_size(Vector *types);
+static int get_data_type_size(Type* ty, Vector* dataTypes);
 
 static void traverse_program(FILE* fp, Vector *dataTypes, Program* prgram);
 static void traverse_stmt(FILE* fp, Vector *dataTypes, Stmt* stmt);
@@ -29,6 +48,8 @@ int generate_binary(char *filename, Vector* types, Program *program, BuildTarget
     char filepath[1024];
 
 	DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
+
+    initialize_data_type_size(types);
 
     result = stat(BUILD_DIR, &st);
     if (result != 0) {
@@ -52,6 +73,22 @@ int generate_binary(char *filename, Vector* types, Program *program, BuildTarget
 
 	DPRINT(stdout, "%s:%d out...\n", __FUNCTION__, __LINE__);
     return 0;
+}
+
+static void initialize_data_type_size(Vector* types)
+{
+    int i, j;
+    Type* ty;
+    Type* c_type;
+    for (i = 0; i < types->size; i++) {
+        ty = (Type *)types->data[i];
+        for (j = 0; j < C_TYPES_LEN; j++) {
+            if (strcmp(ty->name, c_types[j].name) == 0) {
+                ty->size = c_types[j].size;
+            }
+        }
+    }
+    return;
 }
 
 static void traverse_program(FILE* fp, Vector *dataTypes, Program* program)
@@ -109,20 +146,27 @@ static void write_epilogue(FILE* fp)
 static void write_function_args(FILE* fp, Vector *dataTypes, Func* func)
 {
     int i;
+    int alloc_stack_size = 0;
     Variable* arg;
     for (i = 0; i < func->decl->args->size; i++) {
         arg = func->decl->args->data[i];
-        arg->ty;
+        alloc_stack_size  += get_data_type_size(arg->ty, dataTypes);
+    }
+
+    // alloc statck
+    if (0 < alloc_stack_size) {
+        write_asm_with_indent(fp, "sub esp %d", alloc_stack_size);
     }
     return;
 }
+
 static int get_data_type_size(Type *ty, Vector* dataTypes)
 {
     int i;
     Type* tmp;
     for (i = 0; i < dataTypes->size; i++) {
         tmp = dataTypes->data[i];
-        if (strcmp(ty->name, tmp->name)) {
+        if (strcmp(ty->name, tmp->name) == 0) {
             return tmp->size;
         }
     }

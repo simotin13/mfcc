@@ -1,3 +1,4 @@
 int main(int argc) {
-    return 0;
+	int var = 123;
+    return var;
 }

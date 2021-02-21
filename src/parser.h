@@ -14,6 +14,6 @@
 // ============================================================================
 // prototype functions
 // ============================================================================
-int parse_tokens(Vector *tokens, Program *program);
+int parse_tokens(Vector* tokens, Vector* dataTypes, Program* program);
 
 #endif  // _PARSER_H_
