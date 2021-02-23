@@ -32,10 +32,13 @@ static int parse_assign(Token *tLhs, Expression **exp);
 static int get_expression(Token* t, Expression** exp);
 static Expression* exp_new(TokenType ty, void* val);
 
-static int find_var(Vector* vars, char* name, Type* ty);
+static int find_var(Vector* vars, char* name);
 static Token* cur_token();
 static bool is_type_of(Token *t, Vector *types, Type **type);
 static bool is_token_type(Token* t, TokenType tokenType);
+static bool is_term(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Token* t, Term** term);
+static bool is_operator(Token* t);
+
 static Token *consume(void);
 static void error_unexpected_token(TokenType expected);
 
@@ -118,7 +121,6 @@ static int parse_toplevel(Program* program)
     // TODO
     return 0;
 }
-
 static int parse_declare_specifier(DeclType *declType, void **decl) {
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
     bool bResult;
@@ -129,8 +131,20 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
     FuncDecl *funcDecl;
     Type* type;
     vars = vec_new();
+    StorageClass class = ClassLocal;
 
     t = cur_token();
+    bResult = is_token_type(t, T_STATIC);
+    if (bResult) {
+        class = ClassStatic;
+    } else {
+        bResult = is_token_type(t, T_EXTERN);
+        if (bResult) {
+            class = ClassExtern;
+        }
+    }
+    t = consume();
+
     bResult = is_type_of(t, s_types, &type);
     if (bResult != true) {
         return -1;
@@ -159,15 +173,14 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
         if (bResult) {
             // should be function body
             consume();
-            funcDecl = func_decl_new(sym->val, type, vars);
+            funcDecl = func_decl_new(sym->val, class, type, vars);
             *declType = DECL_TYPE_FUNCTION_BODY;
             *decl = funcDecl;
             return 0;
-
         }
         bResult = is_token_type(t, T_SEMICOLON);
         if (bResult) {
-            funcDecl = func_decl_new(sym->val, type, vars);
+            funcDecl = func_decl_new(sym->val, class, type, vars);
             *declType = DECL_TYPE_FUNCTION_PROTOTYPE;
             *decl = funcDecl;
             return 0;
@@ -183,7 +196,7 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
         if (result) {
             // var delare;
             *declType = DECL_TYPE_VAR;
-            *decl = variable_new(sym->val, type, 0);
+            *decl = variable_new(sym->val, class, type, 0);
             return 0;
         }
     }
@@ -337,6 +350,80 @@ static int parse_assign(Token* tLhs, Expression** exp)
     }
     return 0;
 }
+static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody)
+{
+    int result = 0;
+    Token* tmp;
+    bool bResult;
+    Token* t = cur_token();
+    Term* term;
+    // Term(Literal, variable)
+    // Term operator Term
+    while (true) {
+        bResult = is_term(globalVars, funcDecl, funcBody, t, &term);
+        if (bResult) {
+            t = consume();
+            bResult = is_token_type(t, T_SEMICOLON);
+            if (bResult) {
+                consume();
+                break;
+            }
+            bResult = is_operator(t);
+            if (bResult) {
+                t = consume();
+                break;
+            }
+        } else {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token* t, Term **term)
+{
+    long val;
+    char* endptr;
+    bool bResult;
+    Integer* astInt;
+    Variable* var;
+    int idx;
+    Type* ty;
+    bResult = is_token_type(t, T_INTEGER);
+    if (bResult) {
+
+        val = strtol(t->val, &endptr, 10);
+        astInt = ast_int_new(val);
+        ty = &c_types[C_TYPES_IDX_INT];
+        *term = term_new(TermVariable, ty, var);
+        return true;
+    }
+    bResult = is_token_type(t, T_IDENTIFIER);
+    if (bResult) {
+        // search args
+        idx = find_var(funcDecl->args, t->val);
+        if (0 <= idx) {
+            var = funcDecl->args->data[idx];
+            *term = term_new(TermVariable, var->ty, var);
+            return true;
+        }
+
+        // return varible
+        idx = find_var(funcBody->scope->vars, t->val);
+        if (0 <= idx) {
+            var = funcDecl->args->data[idx];
+            *term = term_new(TermVariable, var->ty, var);
+            return true;
+        }
+    }
+
+    return false;
+}
+static bool is_operator(Token* t)
+{
+    // TODO
+    return false;
+}
 
 static int get_expression(Token* t, Expression** exp)
 {
@@ -387,7 +474,7 @@ static int get_return_stmt(FuncDecl *funcDecl, FuncBody *funcBody, Token *t, Stm
     }
     if (is_token_type(t, T_IDENTIFIER)) {
         // return varible
-        idx = find_var(funcBody->scope->vars, t->val, funcDecl->retType);
+        idx = find_var(funcBody->scope->vars, t->val);
         if (0 <= idx) {
             *stmtReturn = stmt_new_stmt_return(t, funcBody->scope->vars->data[idx]);
             return 0;
@@ -397,17 +484,14 @@ static int get_return_stmt(FuncDecl *funcDecl, FuncBody *funcBody, Token *t, Stm
     return -1;
 }
 
-static int find_var(Vector* vars, char* name, Type* ty) {
+static int find_var(Vector* vars, char* name) {
     int i;
     Variable* var;
     bool bResult;
     for (i = 0; i < vars->size; i++) {
         var = vars->data[i];
         if (strcmp(var->name, name) == 0) {
-            bResult = is_same_type(var->ty, ty);
-            if (bResult) {
-                return i;
-            }
+            return i;
         }
     }
     return -1;
@@ -417,6 +501,7 @@ static int parse_variable(Variable **var)
     bool bResult;
     Token* t;
     Type* type;
+    StorageClass class = ClassLocal;
 
     t = cur_token();
     bResult = is_type_of(t, s_types, &type);
@@ -437,7 +522,7 @@ static int parse_variable(Variable **var)
         return -1;
     }
 
-    *var = variable_new(t->val, type, 0);
+    *var = variable_new(t->val, class, type, 0);
     return 0;
 }
 

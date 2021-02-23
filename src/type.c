@@ -5,6 +5,17 @@
 #include "type.h"
 #include "debug.h"
 
+const Type c_types[] =
+{
+    {   0,              0,      "void"      },
+    {   1,   sizeof(char),      "char"      },
+    {   2,   sizeof(short),     "short"     },
+    {   3,   sizeof(int),       "int"       },
+    {   4,   sizeof(long),      "long"      },
+    {   5,   sizeof(float),     "float"     },
+    {   6,   sizeof(double),    "double"    },
+};
+
 Type* type_new(char* name, int size)
 {
     // TODO must set hash value

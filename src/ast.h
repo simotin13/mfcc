@@ -11,6 +11,11 @@ typedef enum {
     ExpInteger,
 } ExpType;
 
+typedef enum {
+    TermLiteral,
+    TermVariable
+} TermType;
+
 // ============================================================================
 // struct define
 // ============================================================================
@@ -20,6 +25,7 @@ typedef struct {
 } Program;
 
 typedef struct {
+    StorageClass class;
     char name[256];
     Type* retType;
     Vector* args;
@@ -58,6 +64,12 @@ typedef struct {
 } Stmt;
 
 typedef struct {
+    TermType type;
+    Type *ty;
+    void* ast;
+} Term;
+
+typedef struct {
     ExpType type;
     void* val;
 } Expression;
@@ -73,4 +85,5 @@ extern Func* func_new(FuncDecl* decl, FuncBody* body);
 extern Scope* scope_new(void);
 extern void scope_add_stmt(Scope* scope, Stmt* stmt);
 extern StmtReturn* stmt_new_stmt_return(Token* t, void* val);
+extern Term* term_new(TermType type, Type *ty, void* ast);
 #endif // _AST_H_

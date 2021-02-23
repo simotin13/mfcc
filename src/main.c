@@ -38,16 +38,7 @@ static int read_file(char *filepath, unsigned int *len);
 // static variables
 // ============================================================================
 static char s_code[CODE_LEN_MAX];
-static const Type c_types[] =
-{
-    {   0,              0,    "void"        },
-    {   1,   sizeof(char),      "char"      },
-    {   2,   sizeof(short),     "short"     },
-    {   3,   sizeof(int),       "int"       },
-    {   4,   sizeof(long),      "long"      },
-    {   5,   sizeof(float),     "float"     },
-    {   6,   sizeof(double),    "double"    },
-};
+
 
 // ============================================================================
 // main

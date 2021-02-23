@@ -47,3 +47,12 @@ Program *program_new()
     program->vars = vec_new();
     return program;
 }
+
+Term *term_new(TermType type, Type *ty, void *ast)
+{
+    Term* term = malloc(sizeof(Term));
+    term->type;
+    term->ty;
+    term->ast = ast;
+    return term;
+}

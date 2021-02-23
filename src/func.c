@@ -3,10 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-FuncDecl *func_decl_new(char *name, Type *retType, Vector *args)
+FuncDecl *func_decl_new(char *name, StorageClass class, Type *retType, Vector *args)
 {
     FuncDecl* funcDecl = malloc(sizeof(FuncDecl));
     strcpy(funcDecl->name, name);
+    funcDecl->class = class;
     funcDecl->retType = retType;
     funcDecl->args = args;
     return funcDecl;
