@@ -32,11 +32,10 @@ Func* func_new(FuncDecl* decl, FuncBody* body)
     return func;
 }
 
-StmtReturn* stmt_new_stmt_return(Token* t, void* val)
+StmtReturn* stmt_new_stmt_return(Expression *exp)
 {
     StmtReturn* stmt = malloc(sizeof(StmtReturn));
-    stmt->t = t;
-    stmt->val = val;
+    stmt->exp = exp;
     return stmt;
 }
 
@@ -57,12 +56,34 @@ Term *term_new(TermType type, Type *ty, void *ast)
     return term;
 }
 
-Operator* op_new(TokenType ty, Term* lhs, Term* rhs)
+Expression* exp_new()
 {
-    Operator* op;
-    op = malloc(sizeof(Operator));
-    op->ty = ty;
-    op->lhs = lhs;
-    op->rhs = rhs;
-    return op;
+    Expression* exp;
+    exp = malloc(sizeof(Expression));
+    exp->operations = vec_new();
+    exp->terms = vec_new();
+    return exp;
+}
+
+void exp_add_op(Expression* exp, TokenType ty)
+{
+    TokenType* opTy = malloc(sizeof(TokenType));
+    *opTy = ty;
+    vec_push(exp->operations, opTy);
+}
+void exp_add_term(Expression* exp, Term* term)
+{
+    vec_push(exp->terms, term);
+}
+
+Variable* variable_new(char* name, StorageClass class, Type* ty, int pointer_level)
+{
+    Variable* var = NULL;
+    var = malloc(sizeof(Variable));
+    strcpy(var->name, name);
+    var->class = class;
+    var->pointer_level = pointer_level;
+    var->ty = ty;
+    var->initialAssignExp = NULL;
+    return var;
 }

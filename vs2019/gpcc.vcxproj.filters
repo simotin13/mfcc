@@ -33,9 +33,6 @@
     <ClCompile Include="..\src\type.c">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\variable.c">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\func.c">
       <Filter>src</Filter>
     </ClCompile>
@@ -72,9 +69,6 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\src\func.h">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\variable.h">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>

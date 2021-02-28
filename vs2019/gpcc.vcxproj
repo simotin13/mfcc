@@ -149,7 +149,6 @@
     <ClCompile Include="..\src\main.c" />
     <ClCompile Include="..\src\parser.c" />
     <ClCompile Include="..\src\type.c" />
-    <ClCompile Include="..\src\variable.c" />
     <ClCompile Include="..\src\vector.c" />
   </ItemGroup>
   <ItemGroup>
@@ -162,7 +161,6 @@
     <ClInclude Include="..\src\lex.h" />
     <ClInclude Include="..\src\parser.h" />
     <ClInclude Include="..\src\type.h" />
-    <ClInclude Include="..\src\variable.h" />
     <ClInclude Include="..\src\vector.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

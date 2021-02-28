@@ -194,7 +194,7 @@ static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *all
     // variable initialize
     for (i = 0; i < vars->size; i++) {
         var = vars->data[i];
-        if (var->iVal == NULL) {
+        if (var->initialAssignExp == NULL) {
             continue;
         }
         write_initial_value(fp, dataTypes, vars, var);
@@ -209,8 +209,11 @@ static void write_initial_value(FILE *fp, Vector *dataTypes, Vector *vars, Varia
     // TODO types 
     if (strcmp(var->ty->name, "int") == 0) {
         get_rbp_offset_var(vars, var, &offset);
+        // TODO generate expression
+#if 0
         astInt = (Integer *)var->iVal;
         write_asm_with_indent(fp, "mov DWORD [rbp - 0x%d], 0x%d", offset, astInt->val);
+#endif
     }
 }
 
@@ -244,6 +247,8 @@ static void traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
     Variable* astVar;
     int offset;
     int ret;
+    // TODO generate exp
+#if 0
     switch (stmtReturn->t->type) {
     case T_INTEGER:
     {
@@ -261,6 +266,7 @@ static void traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
     default:
         break;
     }
+#endif
 }
 
 static int get_rbp_offset_var(Vector* vars, Variable* var, int *offset)

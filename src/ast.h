@@ -54,9 +54,15 @@ typedef struct {
 } Integer;
 
 typedef struct {
-    Token* t;
-    void* val;
-} StmtReturn;
+    TermType type;
+    Type* ty;
+    void* ast;
+} Term;
+
+typedef struct {
+    Vector *operations;
+    Vector *terms;
+} Expression;
 
 typedef struct {
     StatementType type;
@@ -64,20 +70,16 @@ typedef struct {
 } Stmt;
 
 typedef struct {
-    TermType type;
-    Type *ty;
-    void* ast;
-} Term;
-typedef struct {
-    TokenType ty;
-    void* lhs;
-    void* rhs;
-} Operator;
+    Expression* exp;
+} StmtReturn;
 
 typedef struct {
-    Vector operations;
-    Vector terms;
-} Expression;
+    StorageClass class;
+    int pointer_level;
+    Type *ty;
+    char name[256];
+    Expression *initialAssignExp;
+} Variable;
 
 typedef struct {
     Variable* lhs;
@@ -89,7 +91,11 @@ extern Stmt *stmt_new(StatementType type, void* ast);
 extern Func* func_new(FuncDecl* decl, FuncBody* body);
 extern Scope* scope_new(void);
 extern void scope_add_stmt(Scope* scope, Stmt* stmt);
-extern StmtReturn* stmt_new_stmt_return(Token* t, void* val);
-extern Term* term_new(TermType type, Type *ty, void* ast);
-extern Operator* op_new(TokenType op, Term* lhs, Term* rhs);
+extern StmtReturn* stmt_new_stmt_return(Expression* val);
+extern Expression* exp_new();
+extern void exp_add_op(Expression *exp, TokenType op);
+extern void exp_add_term(Expression *exp, Term* term);
+extern Term* term_new(TermType type, Type* ty, void* ast);
+extern Variable* variable_new(char* name, StorageClass class, Type* ty, int pointer_level);
+
 #endif // _AST_H_

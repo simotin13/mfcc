@@ -30,7 +30,6 @@ static int parse_return_stmt(Vector *globalVars, FuncDecl* funcDecl, FuncBody* f
 static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *tLhs, Expression **exp);
 
 static int parse_expression(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Expression** exp);
-static Expression* exp_new(TokenType ty, void* val);
 
 static int find_var(Vector* vars, char* name);
 static Token* cur_token();
@@ -308,7 +307,7 @@ static int parse_local_variables(Vector *globalVars, FuncDecl *funcDecl, FuncBod
             if (ret != 0) {
                 return -1;
             }
-            var->iVal = exp->val;
+            var->initialAssignExp = exp;
         } else {
             // local variable declare
             bResult = is_token_type(t, T_SEMICOLON);
@@ -363,18 +362,20 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
     int result = 0;
     bool bResult;
     Token* t;
-    Term* tLhs = NULL;
-    Term* tRhs = NULL;
-    Operator* astOp;
+    Term* term = NULL;
     ParseExpStatus status = NONE;
-    TokenType op;
+    TokenType opTy;
+
+    *exp = exp_new();
+
     // Term(Literal, variable)
     // Term operator Term
     while (true) {
         t = cur_token();
         if (status == NONE) {
-            bResult = is_term(globalVars, funcDecl, funcBody, t, &tLhs);
+            bResult = is_term(globalVars, funcDecl, funcBody, t, &term);
             if (bResult) {
+                exp_add_term(*exp, term);
                 consume();
                 status = WAIT_OPERATOR;
                 continue;
@@ -384,8 +385,9 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
             }
         }
         if (status == WAIT_TERM) {
-            bResult = is_term(globalVars, funcDecl, funcBody, t, &tRhs);
+            bResult = is_term(globalVars, funcDecl, funcBody, t, &term);
             if (bResult) {
+                exp_add_term(*exp, term);
                 consume();
                 status = WAIT_OPERATOR;
                 continue;
@@ -394,7 +396,8 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
         if (status == WAIT_OPERATOR) {
             bResult = is_operator(t);
             if (bResult) {
-                op = t->type;
+                exp_add_op(*exp, t->type);
+                opTy = t->type;
                 consume();
                 status = WAIT_TERM;
                 continue;
@@ -406,11 +409,9 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
         }
         return -1;
     }
-
-    astOp = op_new(op, tLhs, tRhs);
-
     return 0;
 }
+
 static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token* t, Term **term)
 {
     long val;
@@ -473,23 +474,12 @@ static bool is_operator(Token* t)
     return false;
 }
 
-static Expression* exp_new(TokenType ty, void* val)
-{
-    // TODO
-    Expression* exp;
-#if 0
-    exp = malloc(sizeof(Expression));
-    exp->type = ty;
-    exp->val = val;
-#endif
-    return exp;
-}
-
 static int parse_return_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *t, StmtReturn **stmtReturn)
 {
     int result = 0;
     Expression* exp;
     result = parse_expression(globalVars, funcDecl, funcBody, &exp);
+    *stmtReturn = stmt_new_stmt_return(exp);
     return result;
 }
 
