@@ -27,7 +27,7 @@ static int parse_local_variables(FuncBody* funcBody);
 static int parse_variable(Variable** var);
 static Integer* ast_int_new(long val);
 static int get_return_stmt(FuncDecl *funcDecl, FuncBody *funcBody, Token* t, StmtReturn** stmtReturn);
-static int parse_assign(Token *tLhs, Expression **exp);
+static int parse_assign_stmt(Token *tLhs, Expression **exp);
 
 static int get_expression(Token* t, Expression** exp);
 static Expression* exp_new(TokenType ty, void* val);
@@ -303,7 +303,7 @@ static int parse_local_variables(FuncBody* funcBody)
         if (bResult) {
             // assign
             t = consume();
-            ret = parse_assign(tLhs, &exp);
+            ret = parse_assign_stmt(tLhs, &exp);
             if (ret != 0) {
                 return -1;
             }
@@ -331,7 +331,7 @@ static Integer *ast_int_new(long val)
     return ast;
 }
 
-static int parse_assign(Token* tLhs, Expression** exp)
+static int parse_assign_stmt(Token* tLhs, Expression** exp)
 {
     int ret;
     bool bResult;
