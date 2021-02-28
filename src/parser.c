@@ -22,14 +22,14 @@ typedef enum {
 static int parse_toplevel(Program* program);
 static int parse_declare_specifier(DeclType *declType, void **decl);
 static int parse_function_args(Vector *args);
-static int parse_function_body(FuncDecl* funcDecl, FuncBody* funcBody);
-static int parse_local_variables(FuncBody* funcBody);
+static int parse_function_body(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
+static int parse_local_variables(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
 static int parse_variable(Variable** var);
 static Integer* ast_int_new(long val);
-static int get_return_stmt(FuncDecl *funcDecl, FuncBody *funcBody, Token* t, StmtReturn** stmtReturn);
-static int parse_assign_stmt(Token *tLhs, Expression **exp);
+static int parse_return_stmt(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Token* t, StmtReturn** stmtReturn);
+static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *tLhs, Expression **exp);
 
-static int get_expression(Token* t, Expression** exp);
+static int parse_expression(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Expression** exp);
 static Expression* exp_new(TokenType ty, void* val);
 
 static int find_var(Vector* vars, char* name);
@@ -78,6 +78,7 @@ static int parse_toplevel(Program* program)
     int result = 0;
     DeclType declType;
     Func* func = NULL;
+    Vector* globalVars = NULL;
     FuncDecl* funcDecl = NULL;
     FuncBody* funcBody = NULL;
     void* decl = NULL;
@@ -96,7 +97,7 @@ static int parse_toplevel(Program* program)
         } else if (declType == DECL_TYPE_FUNCTION_BODY) {
             funcDecl = decl;
             funcBody = func_body_new();
-            result = parse_function_body(funcDecl, funcBody);
+            result = parse_function_body(globalVars, funcDecl, funcBody);
             if (result != 0) {
                 return -1;
             }
@@ -238,7 +239,7 @@ static int parse_function_args(Vector *vars)
     return 0;
 }
 
-static int parse_function_body(FuncDecl* funcDecl, FuncBody *funcBody)
+static int parse_function_body(Vector *globalVars, FuncDecl* funcDecl, FuncBody *funcBody)
 {
     bool bResult;
     int ret;
@@ -254,7 +255,7 @@ static int parse_function_body(FuncDecl* funcDecl, FuncBody *funcBody)
         }
 
         // check local variable
-        ret = parse_local_variables(funcBody);
+        ret = parse_local_variables(globalVars, funcDecl, funcBody);
         if (ret < 0) {
             return -1;
         }
@@ -264,18 +265,18 @@ static int parse_function_body(FuncDecl* funcDecl, FuncBody *funcBody)
         bResult = is_token_type(t, T_RETURN);
         if (bResult) {
             t = consume();
-            ret = get_return_stmt(funcDecl, funcBody, t, &stmtReturn);
+            ret = parse_return_stmt(globalVars, funcDecl, funcBody, t, &stmtReturn);
             if (ret != 0) {
                 return -1;
             }
-            stmt = stmt_new(STMT_TYPE_RETURN, stmtReturn);
+            stmt = stmt_new(STMT_TYPE_RETURN, &stmtReturn);
             scope_add_stmt(funcBody->scope, stmt);
         }
         t = consume();
     }
     return 0;
 }
-static int parse_local_variables(FuncBody* funcBody)
+static int parse_local_variables(Vector *globalVars, FuncDecl *funcDecl, FuncBody* funcBody)
 {
     Token* tLhs;
     Token* t;
@@ -303,7 +304,7 @@ static int parse_local_variables(FuncBody* funcBody)
         if (bResult) {
             // assign
             t = consume();
-            ret = parse_assign_stmt(tLhs, &exp);
+            ret = parse_assign_stmt(globalVars, funcDecl, funcBody, tLhs, &exp);
             if (ret != 0) {
                 return -1;
             }
@@ -331,7 +332,7 @@ static Integer *ast_int_new(long val)
     return ast;
 }
 
-static int parse_assign_stmt(Token* tLhs, Expression** exp)
+static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token* tLhs, Expression** exp)
 {
     int ret;
     bool bResult;
@@ -342,7 +343,7 @@ static int parse_assign_stmt(Token* tLhs, Expression** exp)
         if (bResult) {
             break;
         }
-        ret = get_expression(t, exp);
+        ret = parse_expression(globalVars, funcDecl, funcBody, exp);
         if (ret != 0) {
             return ret;
         }
@@ -350,33 +351,63 @@ static int parse_assign_stmt(Token* tLhs, Expression** exp)
     }
     return 0;
 }
-static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody)
+
+typedef enum {
+    NONE,
+    WAIT_TERM,
+    WAIT_OPERATOR,
+} ParseExpStatus;
+
+static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Expression **exp)
 {
     int result = 0;
-    Token* tmp;
     bool bResult;
-    Token* t = cur_token();
-    Term* term;
+    Token* t;
+    Term* tLhs = NULL;
+    Term* tRhs = NULL;
+    Operator* astOp;
+    ParseExpStatus status = NONE;
+    TokenType op;
     // Term(Literal, variable)
     // Term operator Term
     while (true) {
-        bResult = is_term(globalVars, funcDecl, funcBody, t, &term);
-        if (bResult) {
-            t = consume();
-            bResult = is_token_type(t, T_SEMICOLON);
+        t = cur_token();
+        if (status == NONE) {
+            bResult = is_term(globalVars, funcDecl, funcBody, t, &tLhs);
             if (bResult) {
                 consume();
-                break;
+                status = WAIT_OPERATOR;
+                continue;
+            } else {
+                // term must found once
+                return -1;
             }
+        }
+        if (status == WAIT_TERM) {
+            bResult = is_term(globalVars, funcDecl, funcBody, t, &tRhs);
+            if (bResult) {
+                consume();
+                status = WAIT_OPERATOR;
+                continue;
+            }
+        }
+        if (status == WAIT_OPERATOR) {
             bResult = is_operator(t);
             if (bResult) {
-                t = consume();
-                break;
+                op = t->type;
+                consume();
+                status = WAIT_TERM;
+                continue;
             }
-        } else {
-            return -1;
         }
+        bResult = is_token_type(t, T_SEMICOLON);
+        if (bResult) {
+            break;
+        }
+        return -1;
     }
+
+    astOp = op_new(op, tLhs, tRhs);
 
     return 0;
 }
@@ -386,7 +417,7 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
     char* endptr;
     bool bResult;
     Integer* astInt;
-    Variable* var;
+    Variable* var = NULL;
     int idx;
     Type* ty;
     bResult = is_token_type(t, T_INTEGER);
@@ -395,7 +426,7 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
         val = strtol(t->val, &endptr, 10);
         astInt = ast_int_new(val);
         ty = &c_types[C_TYPES_IDX_INT];
-        *term = term_new(TermVariable, ty, var);
+        *term = term_new(TermVariable, ty, &var);
         return true;
     }
     bResult = is_token_type(t, T_IDENTIFIER);
@@ -421,73 +452,50 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
 }
 static bool is_operator(Token* t)
 {
-    // TODO
-    return false;
-}
-
-static int get_expression(Token* t, Expression** exp)
-{
-    long val;
-    char* endptr;
-    switch (t->type)
-    {
-        case T_INTEGER:
-        {
-            val = strtol(t->val, &endptr, 10);
-            *exp = exp_new(t->type, ast_int_new(val));
-        }
-        break;
-    default:
-        break;
+    bool bResult;
+    bResult = is_token_type(t, T_PLUS);
+    if (bResult) {
+        return true;
     }
-    return 0;
+    bResult = is_token_type(t, T_MINUS);
+    if (bResult) {
+        return true;
+    }
+    bResult = is_token_type(t, T_ASTER);
+    if (bResult) {
+        return true;
+    }
+    bResult = is_token_type(t, T_SLASH);
+    if (bResult) {
+        return true;
+    }
+
+    return false;
 }
 
 static Expression* exp_new(TokenType ty, void* val)
 {
+    // TODO
     Expression* exp;
+#if 0
     exp = malloc(sizeof(Expression));
     exp->type = ty;
     exp->val = val;
+#endif
     return exp;
 }
 
-static int get_return_stmt(FuncDecl *funcDecl, FuncBody *funcBody, Token *t, StmtReturn **stmtReturn)
+static int parse_return_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *t, StmtReturn **stmtReturn)
 {
-    long val;
-    char* endptr;
     int result = 0;
-    Integer* astInt;
-    Token *tmp;
-    bool bResult;
-    int idx;
-
-    if (is_token_type(t, T_INTEGER)) {
-        tmp = consume();
-        bResult = is_token_type(tmp, T_SEMICOLON);
-        if (bResult) {
-            val = strtol(t->val, &endptr, 10);
-            astInt = ast_int_new(val);
-            *stmtReturn = stmt_new_stmt_return(t, astInt);
-            return 0;
-        }
-    }
-    if (is_token_type(t, T_IDENTIFIER)) {
-        // return varible
-        idx = find_var(funcBody->scope->vars, t->val);
-        if (0 <= idx) {
-            *stmtReturn = stmt_new_stmt_return(t, funcBody->scope->vars->data[idx]);
-            return 0;
-        }
-    }
-
-    return -1;
+    Expression* exp;
+    result = parse_expression(globalVars, funcDecl, funcBody, &exp);
+    return result;
 }
 
 static int find_var(Vector* vars, char* name) {
     int i;
     Variable* var;
-    bool bResult;
     for (i = 0; i < vars->size; i++) {
         var = vars->data[i];
         if (strcmp(var->name, name) == 0) {

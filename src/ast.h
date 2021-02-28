@@ -68,10 +68,15 @@ typedef struct {
     Type *ty;
     void* ast;
 } Term;
+typedef struct {
+    TokenType ty;
+    void* lhs;
+    void* rhs;
+} Operator;
 
 typedef struct {
-    ExpType type;
-    void* val;
+    Vector operations;
+    Vector terms;
 } Expression;
 
 typedef struct {
@@ -86,4 +91,5 @@ extern Scope* scope_new(void);
 extern void scope_add_stmt(Scope* scope, Stmt* stmt);
 extern StmtReturn* stmt_new_stmt_return(Token* t, void* val);
 extern Term* term_new(TermType type, Type *ty, void* ast);
+extern Operator* op_new(TokenType op, Term* lhs, Term* rhs);
 #endif // _AST_H_

@@ -51,8 +51,18 @@ Program *program_new()
 Term *term_new(TermType type, Type *ty, void *ast)
 {
     Term* term = malloc(sizeof(Term));
-    term->type;
-    term->ty;
+    term->type = type;
+    term->ty = ty;
     term->ast = ast;
     return term;
+}
+
+Operator* op_new(TokenType ty, Term* lhs, Term* rhs)
+{
+    Operator* op;
+    op = malloc(sizeof(Operator));
+    op->ty = ty;
+    op->lhs = lhs;
+    op->rhs = rhs;
+    return op;
 }
