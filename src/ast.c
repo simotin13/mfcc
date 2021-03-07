@@ -59,20 +59,17 @@ Expression* exp_new()
 {
     Expression* exp;
     exp = malloc(sizeof(Expression));
-    exp->operations = vec_new();
-    exp->terms = vec_new();
+    exp->entries = vec_new();
     return exp;
 }
 
-void exp_add_op(Expression* exp, TokenType ty)
+void exp_add_entry(Expression* exp, ExpType expType, void* entry)
 {
-    TokenType* opTy = malloc(sizeof(TokenType));
-    *opTy = ty;
-    vec_push(exp->operations, opTy);
-}
-void exp_add_term(Expression* exp, Term* term)
-{
-    vec_push(exp->terms, term);
+    ExpEntry* expEntry = malloc(sizeof(ExpEntry));
+    expEntry->ty = ExpOperation;
+    expEntry->exp = entry;
+    vec_push(exp->entries, expEntry);
+    return;
 }
 
 Variable* variable_new(char* name, StorageClass class, Type* ty, int pointer_level)

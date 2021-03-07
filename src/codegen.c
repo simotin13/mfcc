@@ -247,7 +247,12 @@ static void traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
     Variable* astVar;
     int offset;
     int ret;
-    // TODO generate exp
+    int i;
+    // generate exp
+    Expression* exp = stmtReturn->exp;
+    ret = exp_traverse(exp);
+    return ret;
+
 #if 0
     switch (stmtReturn->t->type) {
     case T_INTEGER:
@@ -267,8 +272,77 @@ static void traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
         break;
     }
 #endif
+    return;
 }
 
+static int exp_traverse(Expression *exp)
+{
+    int i;
+    Term* termStack[128] = { 0 };
+    TokenType opStack[128] = { 0 };
+    int opPos = 0;
+    int termPos = 0;
+    ExpEntry *entry;
+    Term* term;
+    Term* term1;
+    Term* term2;
+    TokenType tokenType;
+    TokenType calcType;
+    for (i = 0; i < exp->entries->size; i++) {
+        entry = (ExpEntry*)exp->entries->data[i];
+        if (entry->ty == ExpOperation) {
+            tokenType = *(TokenType *)entry->exp;
+            switch (tokenType)
+            {
+            case T_SLASH:
+                term2 = termStack[termPos];
+                termPos--;
+                term1 = termStack[termPos];
+                termPos--;
+
+                // calc divide
+                break;
+            case T_ASTER:
+                term2 = termStack[termPos];
+                termPos--;
+                term1 = termStack[termPos];
+                termPos--;
+
+                // calc multiple
+                break;
+            case T_PLUS:
+            case T_MINUS:
+            case T_OPEN_PAREN:
+                opStack[opPos] = tokenType;
+                opPos++;
+                break;
+            case T_CLOSE_PAREN:
+                if (opPos < 1) {
+                    return -1;
+                }
+                calcType = opStack[opPos];
+                opPos--;
+                if (opStack[opPos] != T_OPEN_PAREN) {
+                    return -1;
+                }
+                // calc
+                term2 = termStack[termPos];
+                termPos--;
+                term1 = termStack[termPos];
+                termPos--;
+                break;
+            default:
+                break;
+            }
+        } else if (entry->ty == ExpTerm) {
+            term = (Term *)entry->exp;
+            termStack[termPos] = term;
+            termPos++;
+        }
+    }
+
+    return 0;
+}
 static int get_rbp_offset_var(Vector* vars, Variable* var, int *offset)
 {
     int i;

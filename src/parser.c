@@ -365,7 +365,7 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
         if (status == NONE) {
             bResult = is_term(globalVars, funcDecl, funcBody, t, &term);
             if (bResult) {
-                exp_add_term(*exp, term);
+                exp_add_entry(*exp, ExpTerm, term);
                 consume();
                 status = WAIT_OPERATOR;
                 continue;
@@ -377,7 +377,7 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
         if (status == WAIT_TERM) {
             bResult = is_term(globalVars, funcDecl, funcBody, t, &term);
             if (bResult) {
-                exp_add_term(*exp, term);
+                exp_add_entry(*exp, ExpTerm, term);
                 consume();
                 status = WAIT_OPERATOR;
                 continue;
@@ -386,7 +386,7 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
         if (status == WAIT_OPERATOR) {
             bResult = is_operator(t);
             if (bResult) {
-                exp_add_op(*exp, t->type);
+                exp_add_entry(*exp, ExpOperation, &t->type);
                 opTy = t->type;
                 consume();
                 status = WAIT_TERM;

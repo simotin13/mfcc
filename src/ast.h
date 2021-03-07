@@ -8,7 +8,8 @@
 // struct define
 // ============================================================================
 typedef enum {
-    ExpInteger,
+    ExpOperation,
+    ExpTerm,
 } ExpType;
 
 typedef enum {
@@ -60,9 +61,13 @@ typedef struct {
 } Term;
 
 typedef struct {
-    Vector *operations;
-    Vector *terms;
+    Vector *entries;
 } Expression;
+
+typedef struct {
+    ExpType ty;
+    void* exp;
+} ExpEntry;
 
 typedef struct {
     StatementType type;
@@ -93,8 +98,7 @@ extern Scope* scope_new(void);
 extern void scope_add_stmt(Scope* scope, Stmt* stmt);
 extern StmtReturn* stmt_new_stmt_return(Expression* val);
 extern Expression* exp_new();
-extern void exp_add_op(Expression *exp, TokenType op);
-extern void exp_add_term(Expression *exp, Term* term);
+extern void exp_add_entry(Expression* exp, ExpType expType, void* entry);
 extern Term* term_new(TermType type, Type* ty, void* ast);
 extern Variable* variable_new(char* name, StorageClass class, Type* ty, int pointer_level);
 
