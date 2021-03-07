@@ -2,7 +2,7 @@
 #define _AST_H_
 
 #include "lex.h"
-#include "variable.h"
+#include "type.h"
 
 // ============================================================================
 // struct define

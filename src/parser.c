@@ -6,7 +6,6 @@
 #include "lex.h"
 #include "ast.h"
 #include "type.h"
-#include "variable.h"
 #include "func.h"
 #include "scope.h"
 
@@ -137,13 +136,14 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
     bResult = is_token_type(t, T_STATIC);
     if (bResult) {
         class = ClassStatic;
+        t = consume();
     } else {
         bResult = is_token_type(t, T_EXTERN);
         if (bResult) {
             class = ClassExtern;
+            t = consume();
         }
     }
-    t = consume();
 
     bResult = is_type_of(t, s_types, &type);
     if (bResult != true) {
@@ -337,18 +337,8 @@ static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *f
     bool bResult;
     Token *t;
     t = cur_token();
-    while (true) {
-        bResult = is_token_type(t, T_SEMICOLON);
-        if (bResult) {
-            break;
-        }
-        ret = parse_expression(globalVars, funcDecl, funcBody, exp);
-        if (ret != 0) {
-            return ret;
-        }
-        t = consume();
-    }
-    return 0;
+    ret = parse_expression(globalVars, funcDecl, funcBody, exp);
+    return ret;
 }
 
 typedef enum {
