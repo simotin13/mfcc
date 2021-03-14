@@ -31,10 +31,10 @@ Func* func_new(FuncDecl* decl, FuncBody* body)
     return func;
 }
 
-StmtReturn* stmt_new_stmt_return(Expression *exp)
+StmtReturn* stmt_new_stmt_return(AstNode *node)
 {
     StmtReturn* stmt = malloc(sizeof(StmtReturn));
-    stmt->exp = exp;
+    stmt->node = node;
     return stmt;
 }
 
@@ -49,27 +49,32 @@ Program *program_new()
 Term *term_new(TermType type, Type *ty, void *ast)
 {
     Term* term = malloc(sizeof(Term));
-    term->type = type;
+    term->termType = type;
     term->ty = ty;
     term->ast = ast;
     return term;
 }
-
-Expression* exp_new()
+AstNode* node_new(NodeType type, void *entry) {
+    AstNode* node = malloc(sizeof(AstNode));
+    node->type = type;
+    node->entry = entry;
+    return node;
+}
+AstBinary* ast_binary_new(OperationType op, AstNode* lhs, AstNode* rhs)
 {
-    Expression* exp;
-    exp = malloc(sizeof(Expression));
-    exp->entries = vec_new();
-    return exp;
+    AstBinary* ast = malloc(sizeof(AstBinary));
+    ast->op = op;
+    ast->lhs = lhs;
+    ast->rhs = rhs;
+    return ast;
 }
 
-void exp_add_entry(Expression* exp, ExpType expType, void* entry)
+AstBinary* ast_binary_set_elements(AstBinary *ast, OperationType op, AstNode *lhs, AstNode *rhs)
 {
-    ExpEntry* expEntry = malloc(sizeof(ExpEntry));
-    expEntry->ty = ExpOperation;
-    expEntry->exp = entry;
-    vec_push(exp->entries, expEntry);
-    return;
+    ast->op = op;
+    ast->lhs = lhs;
+    ast->rhs = rhs;
+    return ast;
 }
 
 Variable* variable_new(char* name, StorageClass class, Type* ty, int pointer_level)
@@ -80,6 +85,6 @@ Variable* variable_new(char* name, StorageClass class, Type* ty, int pointer_lev
     var->class = class;
     var->pointer_level = pointer_level;
     var->ty = ty;
-    var->initialAssignExp = NULL;
+    var->initialAssign = NULL;
     return var;
 }

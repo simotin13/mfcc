@@ -55,14 +55,33 @@ typedef struct {
 } Integer;
 
 typedef struct {
-    TermType type;
+    TermType termType;
     Type* ty;
     void* ast;
 } Term;
 
+typedef enum {
+    NODE_TERM,
+    NODE_BINARY,
+} NodeType;
+
+typedef enum {
+    OPERATION_ADD,
+    OPERATION_SUB,
+    OPERATION_MUL,
+    OPERATION_DIV,
+} OperationType;
+
 typedef struct {
-    Vector *entries;
-} Expression;
+    NodeType type;
+    void* entry;
+} AstNode;
+
+typedef struct {
+    OperationType op;
+    AstNode* lhs;
+    AstNode* rhs;
+} AstBinary;
 
 typedef struct {
     ExpType ty;
@@ -75,7 +94,7 @@ typedef struct {
 } Stmt;
 
 typedef struct {
-    Expression* exp;
+    AstNode* node;
 } StmtReturn;
 
 typedef struct {
@@ -83,12 +102,12 @@ typedef struct {
     int pointer_level;
     Type *ty;
     char name[256];
-    Expression *initialAssignExp;
+    AstNode *initialAssign;
 } Variable;
 
 typedef struct {
-    Variable* lhs;
-    Expression* rhs;
+    Variable* var;
+    AstNode* ast;
 } AssignStmt;
 
 extern Program* program_new();
@@ -96,9 +115,9 @@ extern Stmt *stmt_new(StatementType type, void* ast);
 extern Func* func_new(FuncDecl* decl, FuncBody* body);
 extern Scope* scope_new(void);
 extern void scope_add_stmt(Scope* scope, Stmt* stmt);
-extern StmtReturn* stmt_new_stmt_return(Expression* val);
-extern Expression* exp_new();
-extern void exp_add_entry(Expression* exp, ExpType expType, void* entry);
+extern StmtReturn* stmt_new_stmt_return(AstNode* node);
+AstNode* node_new(NodeType type, void* entry);
+extern AstBinary* ast_binary_new(OperationType op, AstNode *lhs, AstNode *rhs);
 extern Term* term_new(TermType type, Type* ty, void* ast);
 extern Variable* variable_new(char* name, StorageClass class, Type* ty, int pointer_level);
 

@@ -29,10 +29,13 @@ static const Type c_types[] =
 static void initialize_data_type_size(Vector *types);
 static int get_data_type_size(Type* ty, Vector* dataTypes);
 
-static void traverse_program(FILE* fp, Vector *dataTypes, Program* prgram);
-static void traverse_stmt(FILE* fp, FuncBody *funcBody, Vector *dataTypes, Stmt* stmt);
-static void traverse_return(FILE* fp, FuncBody *funcBody, StmtReturn* stmtReturn);
+static int traverse_program(FILE* fp, Vector *dataTypes, Program* prgram);
+static int traverse_stmt(FILE* fp, FuncBody *funcBody, Vector *dataTypes, Stmt* stmt);
+static int traverse_return(FILE* fp, FuncBody *funcBody, StmtReturn* stmtReturn);
 
+static int traverse_node(FILE *fp , AstNode *node);
+static int travarse_term(FILE* fp, Term* term);
+static int travarse_binary(FILE* fp, AstBinary* binary);
 
 static void write_asm_with_indent(FILE* fp, char* fmt, ...);
 static void write_prologue(FILE* fp);
@@ -94,7 +97,7 @@ static void initialize_data_type_size(Vector* types)
     return;
 }
 
-static void traverse_program(FILE* fp, Vector *dataTypes, Program* program)
+static int traverse_program(FILE* fp, Vector *dataTypes, Program* program)
 {
     int i, j;
     Func* func;
@@ -118,19 +121,21 @@ static void traverse_program(FILE* fp, Vector *dataTypes, Program* program)
         }
         write_epilogue(fp, allocSize);
     }
-    return;
+    return 0;
 }
 
-static void traverse_stmt(FILE* fp, FuncBody *funcBody, Vector *dataTypes, Stmt* stmt)
+static int traverse_stmt(FILE* fp, FuncBody *funcBody, Vector *dataTypes, Stmt* stmt)
 {
+    StmtReturn* returnStmt;
     switch (stmt->type) {
     case STMT_TYPE_RETURN:
-        traverse_return(fp, funcBody, (StmtReturn *)stmt->ast);
+        returnStmt = (StmtReturn*)stmt->ast;
+        traverse_return(fp, funcBody, returnStmt);
         break;
     default:
         break;
     }
-    return;
+    return 0;
 }
 
 static void write_prologue(FILE* fp)
@@ -194,7 +199,7 @@ static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *all
     // variable initialize
     for (i = 0; i < vars->size; i++) {
         var = vars->data[i];
-        if (var->initialAssignExp == NULL) {
+        if (var->initialAssign == NULL) {
             continue;
         }
         write_initial_value(fp, dataTypes, vars, var);
@@ -205,7 +210,6 @@ static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *all
 static void write_initial_value(FILE *fp, Vector *dataTypes, Vector *vars, Variable* var)
 {
     int offset;
-    Integer* astInt;
     // TODO types 
     if (strcmp(var->ty->name, "int") == 0) {
         get_rbp_offset_var(vars, var, &offset);
@@ -242,107 +246,106 @@ static void write_asm_with_indent(FILE* fp, char *fmt, ...)
     return;
 }
 
-static void traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
+static int traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
     Integer* astInt;
     Variable* astVar;
     int offset;
     int ret;
     int i;
     // generate exp
-    Expression* exp = stmtReturn->exp;
-    ret = exp_traverse(exp);
+    AstNode* node = stmtReturn->node;
+    ret = traverse_node(fp, node);
     return ret;
+}
 
-#if 0
-    switch (stmtReturn->t->type) {
-    case T_INTEGER:
-    {
-        astInt = (Integer*)(stmtReturn->val);
-        write_asm_with_indent(fp, "mov eax, %d", astInt->val);
+static int traverse_node(FILE *fp, AstNode *node)
+{
+    Term* term;
+    AstBinary* bin;
+    switch (node->type) {
+    case NODE_TERM:
+        term = node->entry;
+        travarse_term(fp, term);
+        break;
+    case NODE_BINARY:
+        bin = node->entry;
+        travarse_binary(fp, bin);
         break;
     }
-    case T_IDENTIFIER:
-    {
-        astVar = (Variable*)(stmtReturn->val);
-        ret = get_rbp_offset_var(body->scope->vars, astVar, &offset);
-        write_asm_with_indent(fp, "mov eax, DWORD [rbp-0x%d]", offset);
+    return 0;
+}
+
+static int travarse_term(FILE* fp, Term* term)
+{
+    Integer* integer;
+    switch (term->termType) {
+    case TermLiteral:
+        integer = (Integer *)term->ast;
+        write_asm_with_indent(fp ,"mov eax %02X", integer->val);
+        write_asm_with_indent(fp, "push eax");
         break;
+    case TermVariable:
+        // TODO
+        break;
+    default:
+        return -1;
     }
+}
+
+static int travarse_binary(FILE *fp, AstBinary* binary)
+{
+    traverse_node(fp, binary->lhs);
+    traverse_node(fp, binary->rhs);
+
+    switch (binary->op)
+    {
+    case OPERATION_ADD:
+        // TODO calc reg
+        write_asm_with_indent(fp, "pop ebx");
+        write_asm_with_indent(fp, "pop eax");
+        write_asm_with_indent(fp, "add eax, ebx");
+        write_asm_with_indent(fp, "push eax");
+        break;
+    case OPERATION_SUB:
+        break;
+    case OPERATION_MUL:
+        break;
+    case OPERATION_DIV:
+        break;
+
     default:
         break;
     }
-#endif
-    return;
 }
 
-static int exp_traverse(Expression *exp)
+static void gen_unary_operation(FILE *fp, TokenType t, Term* term1, Term* term2)
 {
-    int i;
-    Term* termStack[128] = { 0 };
-    TokenType opStack[128] = { 0 };
-    int opPos = 0;
-    int termPos = 0;
-    ExpEntry *entry;
-    Term* term;
-    Term* term1;
-    Term* term2;
-    TokenType tokenType;
-    TokenType calcType;
-    for (i = 0; i < exp->entries->size; i++) {
-        entry = (ExpEntry*)exp->entries->data[i];
-        if (entry->ty == ExpOperation) {
-            tokenType = *(TokenType *)entry->exp;
-            switch (tokenType)
-            {
-            case T_SLASH:
-                term2 = termStack[termPos];
-                termPos--;
-                term1 = termStack[termPos];
-                termPos--;
-
-                // calc divide
-                break;
-            case T_ASTER:
-                term2 = termStack[termPos];
-                termPos--;
-                term1 = termStack[termPos];
-                termPos--;
-
-                // calc multiple
-                break;
-            case T_PLUS:
-            case T_MINUS:
-            case T_OPEN_PAREN:
-                opStack[opPos] = tokenType;
-                opPos++;
-                break;
-            case T_CLOSE_PAREN:
-                if (opPos < 1) {
-                    return -1;
-                }
-                calcType = opStack[opPos];
-                opPos--;
-                if (opStack[opPos] != T_OPEN_PAREN) {
-                    return -1;
-                }
-                // calc
-                term2 = termStack[termPos];
-                termPos--;
-                term1 = termStack[termPos];
-                termPos--;
-                break;
-            default:
-                break;
-            }
-        } else if (entry->ty == ExpTerm) {
-            term = (Term *)entry->exp;
-            termStack[termPos] = term;
-            termPos++;
-        }
+    Integer* astInt1;
+    Integer* astInt2;
+    astInt1 = (Integer*)term1->ast;
+    astInt2 = (Integer*)term2->ast;
+    switch (t) {
+    case T_PLUS:
+        write_asm_with_indent(fp, "mov rax, %02X", astInt1);
+        write_asm_with_indent(fp, "add rax, %02X", astInt2);
+        write_asm_with_indent(fp, "push rax");
+        break;
+    case T_MINUS:
+        write_asm_with_indent(fp, "mov rax, %02X", astInt1);
+        write_asm_with_indent(fp, "sub rax, %02X", astInt2);
+        write_asm_with_indent(fp, "push rax");
+        break;
+    case T_ASTER:
+        write_asm_with_indent(fp, "mov rax, %02X", astInt1);
+        write_asm_with_indent(fp, "mul rax, %02X", astInt2);
+        write_asm_with_indent(fp, "push rax");
+        break;
+    case T_SLASH:
+        // TODO
+        break;
     }
-
-    return 0;
 }
+
 static int get_rbp_offset_var(Vector* vars, Variable* var, int *offset)
 {
     int i;

@@ -26,16 +26,15 @@ static int parse_local_variables(Vector* globalVars, FuncDecl* funcDecl, FuncBod
 static int parse_variable(Variable** var);
 static Integer* ast_int_new(long val);
 static int parse_return_stmt(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Token* t, StmtReturn** stmtReturn);
-static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *tLhs, Expression **exp);
-
-static int parse_expression(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Expression** exp);
+static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *tLhs, AstNode **nodeTop);
+static int parse_expression(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, AstNode** nodeTop);
 
 static int find_var(Vector* vars, char* name);
 static Token* cur_token();
 static bool is_type_of(Token *t, Vector *types, Type **type);
 static bool is_token_type(Token* t, TokenType tokenType);
 static bool is_term(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Token* t, Term** term);
-static bool is_operator(Token* t);
+static bool is_operator(Token* t, OperationType *op);
 
 static Token *consume(void);
 static void error_unexpected_token(TokenType expected);
@@ -268,7 +267,7 @@ static int parse_function_body(Vector *globalVars, FuncDecl* funcDecl, FuncBody 
             if (ret != 0) {
                 return -1;
             }
-            stmt = stmt_new(STMT_TYPE_RETURN, &stmtReturn);
+            stmt = stmt_new(STMT_TYPE_RETURN, stmtReturn);
             scope_add_stmt(funcBody->scope, stmt);
         }
         t = consume();
@@ -282,7 +281,7 @@ static int parse_local_variables(Vector *globalVars, FuncDecl *funcDecl, FuncBod
     Type* type;
     bool bResult;
     Variable *var;
-    Expression* exp;
+    AstNode* node;
     int ret;
 
     while (true) {
@@ -303,11 +302,11 @@ static int parse_local_variables(Vector *globalVars, FuncDecl *funcDecl, FuncBod
         if (bResult) {
             // assign
             t = consume();
-            ret = parse_assign_stmt(globalVars, funcDecl, funcBody, tLhs, &exp);
+            ret = parse_assign_stmt(globalVars, funcDecl, funcBody, tLhs, &node);
             if (ret != 0) {
                 return -1;
             }
-            var->initialAssignExp = exp;
+            var->initialAssign = node;
         } else {
             // local variable declare
             bResult = is_token_type(t, T_SEMICOLON);
@@ -331,13 +330,12 @@ static Integer *ast_int_new(long val)
     return ast;
 }
 
-static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token* tLhs, Expression** exp)
+static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token* tLhs, AstNode** nodeTop)
 {
     int ret;
-    bool bResult;
     Token *t;
     t = cur_token();
-    ret = parse_expression(globalVars, funcDecl, funcBody, exp);
+    ret = parse_expression(globalVars, funcDecl, funcBody, nodeTop);
     return ret;
 }
 
@@ -347,58 +345,99 @@ typedef enum {
     WAIT_OPERATOR,
 } ParseExpStatus;
 
-static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Expression **exp)
+static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, AstNode **node)
 {
     int result = 0;
-    bool bResult;
     Token* t;
+    AstBinary* astBin;
     Term* term = NULL;
-    ParseExpStatus status = NONE;
-    TokenType opTy;
-
-    *exp = exp_new();
-
-    // Term(Literal, variable)
-    // Term operator Term
+    AstNode *tmp = NULL;
+    AstNode *lhs = NULL;
+    AstNode *rhs = NULL;
+    OperationType opStack[32] = { 0 };
+    OperationType op;
+    AstNode* nodeStack[32] = { 0 };
+    int opPos = 0;
+    int nodePos = 0;
+    int nest = 0;
     while (true) {
         t = cur_token();
-        if (status == NONE) {
-            bResult = is_term(globalVars, funcDecl, funcBody, t, &term);
-            if (bResult) {
-                exp_add_entry(*exp, ExpTerm, term);
-                consume();
-                status = WAIT_OPERATOR;
-                continue;
-            } else {
-                // term must found once
+        if (is_token_type(t, T_OPEN_PAREN)) {
+            nest++;
+            consume();
+            continue;
+        }
+        if (is_token_type(t, T_CLOSE_PAREN)) {
+            nest--;
+            if (nest < 0) {
                 return -1;
             }
-        }
-        if (status == WAIT_TERM) {
-            bResult = is_term(globalVars, funcDecl, funcBody, t, &term);
-            if (bResult) {
-                exp_add_entry(*exp, ExpTerm, term);
-                consume();
-                status = WAIT_OPERATOR;
-                continue;
+            if (0 < opPos) {
+                opPos--;
+                op = opStack[opPos];
+
+                nodePos--;
+                rhs = nodeStack[nodePos];
+
+                nodePos--;
+                lhs = nodeStack[nodePos];
+
+                astBin = ast_binary_new(op, lhs, rhs);
+                {
+                    int aaa = 0;
+                    Integer* a, * b;
+                    AstNode* debug1, *debug2;
+                    Term* t1, * t2;
+                    debug1 = astBin->lhs;
+                    debug2 = astBin->rhs;
+                    t1 = debug1->entry;
+                    t2 = debug1->entry;
+                    a = t1->ast;
+                    b = t2->ast;
+                    aaa = 333;
+                }
+
+                nodeStack[nodePos] = node_new(NODE_BINARY, astBin);
+                nodePos++;
             }
+            consume();
+            continue;
         }
-        if (status == WAIT_OPERATOR) {
-            bResult = is_operator(t);
-            if (bResult) {
-                exp_add_entry(*exp, ExpOperation, &t->type);
-                opTy = t->type;
-                consume();
-                status = WAIT_TERM;
-                continue;
-            }
+        if (is_operator(t, &op)) {
+            opStack[opPos] = op;
+            opPos++;
+            consume();
+            continue;
         }
-        bResult = is_token_type(t, T_SEMICOLON);
-        if (bResult) {
+        if (is_term(globalVars, funcDecl, funcBody, t, &term)) {
+            nodeStack[nodePos] = node_new(NODE_TERM, term);
+            nodePos++;
+            consume();
+            continue;
+        }
+
+        if (is_token_type(t, T_SEMICOLON)) {
             break;
         }
-        return -1;
     }
+
+    while (0 < opPos) {
+        opPos--;
+        op = opStack[opPos];
+        nodePos--;
+        tmp = nodeStack[nodePos];
+        rhs = node_new(tmp->type, tmp->entry);
+
+        nodePos--;
+        tmp = nodeStack[nodePos];
+        lhs = node_new(tmp->type, tmp->entry);
+
+        astBin = ast_binary_new(op, lhs, rhs);
+        nodeStack[nodePos] = node_new(NODE_BINARY, astBin);
+        nodePos++;
+    }
+
+    *node = nodeStack[0];
     return 0;
 }
 
@@ -407,7 +446,6 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
     long val;
     char* endptr;
     bool bResult;
-    Integer* astInt;
     Variable* var = NULL;
     int idx;
     Type* ty;
@@ -415,9 +453,8 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
     if (bResult) {
 
         val = strtol(t->val, &endptr, 10);
-        astInt = ast_int_new(val);
         ty = &c_types[C_TYPES_IDX_INT];
-        *term = term_new(TermVariable, ty, &var);
+        *term = term_new(TermLiteral, ty, ast_int_new(val));
         return true;
     }
     bResult = is_token_type(t, T_IDENTIFIER);
@@ -441,23 +478,27 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
 
     return false;
 }
-static bool is_operator(Token* t)
+static bool is_operator(Token* t, OperationType *op)
 {
     bool bResult;
     bResult = is_token_type(t, T_PLUS);
     if (bResult) {
+        *op = OPERATION_ADD;
         return true;
     }
     bResult = is_token_type(t, T_MINUS);
     if (bResult) {
+        *op = OPERATION_SUB;
         return true;
     }
     bResult = is_token_type(t, T_ASTER);
     if (bResult) {
+        *op = OPERATION_MUL;
         return true;
     }
     bResult = is_token_type(t, T_SLASH);
     if (bResult) {
+        *op = OPERATION_DIV;
         return true;
     }
 
@@ -467,9 +508,9 @@ static bool is_operator(Token* t)
 static int parse_return_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *t, StmtReturn **stmtReturn)
 {
     int result = 0;
-    Expression* exp;
-    result = parse_expression(globalVars, funcDecl, funcBody, &exp);
-    *stmtReturn = stmt_new_stmt_return(exp);
+    AstNode* node;
+    result = parse_expression(globalVars, funcDecl, funcBody, &node);
+    *stmtReturn = stmt_new_stmt_return(node);
     return result;
 }
 
