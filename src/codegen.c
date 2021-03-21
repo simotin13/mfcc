@@ -281,8 +281,8 @@ static int travarse_term(FILE* fp, Term* term)
     switch (term->termType) {
     case TermLiteral:
         integer = (Integer *)term->ast;
-        write_asm_with_indent(fp ,"mov eax %02X", integer->val);
-        write_asm_with_indent(fp, "push eax");
+        write_asm_with_indent(fp ,"mov rax, 0x%02X", integer->val);
+        write_asm_with_indent(fp, "push rax");
         break;
     case TermVariable:
         // TODO
@@ -301,14 +301,18 @@ static int travarse_binary(FILE *fp, AstBinary* binary)
     {
     case OPERATION_ADD:
         // TODO calc reg
-        write_asm_with_indent(fp, "pop ebx");
-        write_asm_with_indent(fp, "pop eax");
-        write_asm_with_indent(fp, "add eax, ebx");
-        write_asm_with_indent(fp, "push eax");
+        write_asm_with_indent(fp, "pop rbx");
+        write_asm_with_indent(fp, "pop rax");
+        write_asm_with_indent(fp, "add rax, rbx");
+        write_asm_with_indent(fp, "push rax");
         break;
     case OPERATION_SUB:
         break;
     case OPERATION_MUL:
+        write_asm_with_indent(fp, "pop rbx");
+        write_asm_with_indent(fp, "pop rax");
+        write_asm_with_indent(fp, "imul rax, rbx");
+        write_asm_with_indent(fp, "push rax");
         break;
     case OPERATION_DIV:
         break;
@@ -326,18 +330,18 @@ static void gen_unary_operation(FILE *fp, TokenType t, Term* term1, Term* term2)
     astInt2 = (Integer*)term2->ast;
     switch (t) {
     case T_PLUS:
-        write_asm_with_indent(fp, "mov rax, %02X", astInt1);
-        write_asm_with_indent(fp, "add rax, %02X", astInt2);
+        write_asm_with_indent(fp, "mov rax, 0x%02X", astInt1);
+        write_asm_with_indent(fp, "add rax, 0x%02X", astInt2);
         write_asm_with_indent(fp, "push rax");
         break;
     case T_MINUS:
-        write_asm_with_indent(fp, "mov rax, %02X", astInt1);
+        write_asm_with_indent(fp, "mov rax, 0x%02X", astInt1);
         write_asm_with_indent(fp, "sub rax, %02X", astInt2);
         write_asm_with_indent(fp, "push rax");
         break;
     case T_ASTER:
-        write_asm_with_indent(fp, "mov rax, %02X", astInt1);
-        write_asm_with_indent(fp, "mul rax, %02X", astInt2);
+        write_asm_with_indent(fp, "mov rax, 0x%02X", astInt1);
+        write_asm_with_indent(fp, "mul rax, 0x%02X", astInt2);
         write_asm_with_indent(fp, "push rax");
         break;
     case T_SLASH:
