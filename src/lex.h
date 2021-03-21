@@ -18,10 +18,10 @@ typedef enum
     T_SEMICOLON,
     T_EQUAL,
     T_IDENTIFIER,
-    T_OPEN_PAREN,
-    T_CLOSE_PAREN,
-    T_OPEN_BRACE,
-    T_CLOSE_BRACE,
+    T_OPEN_PAREN,       // (
+    T_CLOSE_PAREN,      // )
+    T_OPEN_BRACE,       // {
+    T_CLOSE_BRACE,      // }
     // keywords
     T_VOID,
     T_CHAR,
