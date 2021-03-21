@@ -14,18 +14,6 @@
 // ============================================================================
 // static variables
 // ============================================================================
-static char s_code[CODE_LEN_MAX];
-static const Type c_types[] =
-{
-    {   0,              0,    "void"        },
-    {   1,   sizeof(char),      "char"      },
-    {   2,   sizeof(short),     "short"     },
-    {   3,   sizeof(int),       "int"       },
-    {   4,   sizeof(long),      "long"      },
-    {   5,   sizeof(float),     "float"     },
-    {   6,   sizeof(double),    "double"    },
-};
-
 static void initialize_data_type_size(Vector *types);
 static int get_data_type_size(Type* ty, Vector* dataTypes);
 
@@ -50,26 +38,13 @@ static int get_rbp_offset_var(Vector* vars, Variable* var, int* offset);
 int generate_binary(char *filename, Vector* types, Program *program, BuildTargetType target)
 {
     FILE *fp;
-    struct stat st;
-    int result;
-    char filepath[1024];
 
 	DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
 
     initialize_data_type_size(types);
-
-    result = stat(BUILD_DIR, &st);
-    if (result != 0) {
-#if defined(_WIN64) || defined(_WIN32)
-        // for windows
-        mkdir(BUILD_DIR);
-#else
-#endif
-    }
-    sprintf(filepath, "%s/%s", BUILD_DIR, filename);
-    fp = fopen(filepath, "w");
+    fp = fopen(filename, "w");
     if (fp == NULL) {
-        fprintf(stderr, "file open failed:[%s].\n", filepath);
+        fprintf(stderr, "file open failed:[%s].\n", filename);
         exit(1);
     }
 
@@ -147,16 +122,18 @@ static void write_prologue(FILE* fp)
 
 static void write_epilogue(FILE* fp, int frameSize)
 {
-    write_asm_with_indent(fp, "add esp, 0x%d", frameSize);
+    if (0 < frameSize) {
+        write_asm_with_indent(fp, "add rsp, 0x%d", frameSize);
+    }
     write_asm_with_indent(fp, "mov rsp, rbp");
     write_asm_with_indent(fp, "pop rbp");
     write_asm_with_indent(fp, "ret");
     return;
 }
 
+#if 0
 static void write_function_args(FILE* fp, Vector *dataTypes, Func* func)
 {
-#if 0
     int i;
     int alloc_stack_size = 0;
     Variable* arg;
@@ -167,7 +144,7 @@ static void write_function_args(FILE* fp, Vector *dataTypes, Func* func)
 
     // alloc statck
     if (0 < alloc_stack_size) {
-        write_asm_with_indent(fp, "sub esp %d", alloc_stack_size);
+        write_asm_with_indent(fp, "sub rsp %d", alloc_stack_size);
     }
 
     // variable initialize
@@ -175,9 +152,9 @@ static void write_function_args(FILE* fp, Vector *dataTypes, Func* func)
         arg = func->decl->args->data[i];
         write_initial_value(fp, dataTypes, func->body->scope->vars, arg);
     }
-#endif
     return;
 }
+#endif
 
 static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *allocSize)
 {
@@ -192,8 +169,8 @@ static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *all
     }
 
     // alloc statck
-    if (0 < allocSize) {
-        write_asm_with_indent(fp, "sub esp, %d", *allocSize);
+    if (0 < *allocSize) {
+        write_asm_with_indent(fp, "sub rsp, %d", *allocSize);
     }
 
     // variable initialize
@@ -247,14 +224,11 @@ static void write_asm_with_indent(FILE* fp, char *fmt, ...)
 }
 
 static int traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
-    Integer* astInt;
-    Variable* astVar;
-    int offset;
     int ret;
-    int i;
     // generate exp
     AstNode* node = stmtReturn->node;
     ret = traverse_node(fp, node);
+    write_asm_with_indent(fp, "pop rax");
     return ret;
 }
 
@@ -290,6 +264,8 @@ static int travarse_term(FILE* fp, Term* term)
     default:
         return -1;
     }
+
+    return 0;
 }
 
 static int travarse_binary(FILE *fp, AstBinary* binary)
@@ -320,34 +296,7 @@ static int travarse_binary(FILE *fp, AstBinary* binary)
     default:
         break;
     }
-}
-
-static void gen_unary_operation(FILE *fp, TokenType t, Term* term1, Term* term2)
-{
-    Integer* astInt1;
-    Integer* astInt2;
-    astInt1 = (Integer*)term1->ast;
-    astInt2 = (Integer*)term2->ast;
-    switch (t) {
-    case T_PLUS:
-        write_asm_with_indent(fp, "mov rax, 0x%02X", astInt1);
-        write_asm_with_indent(fp, "add rax, 0x%02X", astInt2);
-        write_asm_with_indent(fp, "push rax");
-        break;
-    case T_MINUS:
-        write_asm_with_indent(fp, "mov rax, 0x%02X", astInt1);
-        write_asm_with_indent(fp, "sub rax, %02X", astInt2);
-        write_asm_with_indent(fp, "push rax");
-        break;
-    case T_ASTER:
-        write_asm_with_indent(fp, "mov rax, 0x%02X", astInt1);
-        write_asm_with_indent(fp, "mul rax, 0x%02X", astInt2);
-        write_asm_with_indent(fp, "push rax");
-        break;
-    case T_SLASH:
-        // TODO
-        break;
-    }
+    return 0;
 }
 
 static int get_rbp_offset_var(Vector* vars, Variable* var, int *offset)

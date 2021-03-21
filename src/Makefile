@@ -1,23 +1,21 @@
 TARGET=gpcc
 
-CFLAGS=	-g -Wall
+CFLAGS=-Wall -g
 
 SRCS=			\
-	main.c		\
-	debug.c		\
-	vector.c	\
-	lex.c		\
-	parser.c	\
+	ast.c		\
 	codegen.c	\
-    	hash.c		\
+	debug.c		\
 	func.c		\
-        ast.c		\
-	variable.c
+	hash.c		\
+	lex.c		\
+	main.c		\
+	parser.c	\
+	type.c		\
+	vector.c
 
 all:
-	gcc ${SRCS} ${CFLAGS} -o ${TARGET}
+	gcc ${CFLAGS} ${SRCS} -o ${TARGET}
 
 clean :
 	rm -f ${TARGET} *.o build/tmp.S
-
-

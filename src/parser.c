@@ -37,7 +37,6 @@ static bool is_term(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, 
 static bool is_operator(Token* t, OperationType *op);
 
 static Token *consume(void);
-static void error_unexpected_token(TokenType expected);
 
 // token info
 static Token* s_tokens = NULL;
@@ -333,8 +332,6 @@ static Integer *ast_int_new(long val)
 static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token* tLhs, AstNode** nodeTop)
 {
     int ret;
-    Token *t;
-    t = cur_token();
     ret = parse_expression(globalVars, funcDecl, funcBody, nodeTop);
     return ret;
 }
@@ -347,7 +344,6 @@ typedef enum {
 
 static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, AstNode **node)
 {
-    int result = 0;
     Token* t;
     AstBinary* astBin;
     Term* term = NULL;
@@ -383,20 +379,6 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
                 lhs = nodeStack[nodePos];
 
                 astBin = ast_binary_new(op, lhs, rhs);
-                {
-                    int aaa = 0;
-                    Integer* a, * b;
-                    AstNode* debug1, *debug2;
-                    Term* t1, * t2;
-                    debug1 = astBin->lhs;
-                    debug2 = astBin->rhs;
-                    t1 = debug1->entry;
-                    t2 = debug1->entry;
-                    a = t1->ast;
-                    b = t2->ast;
-                    aaa = 333;
-                }
-
                 nodeStack[nodePos] = node_new(NODE_BINARY, astBin);
                 nodePos++;
             }
@@ -453,7 +435,7 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
     if (bResult) {
 
         val = strtol(t->val, &endptr, 10);
-        ty = &c_types[C_TYPES_IDX_INT];
+        ty = (Type*)&(c_types[C_TYPES_IDX_INT]);
         *term = term_new(TermLiteral, ty, ast_int_new(val));
         return true;
     }
@@ -591,10 +573,5 @@ static Token *consume()
         return NULL;
     }
     return &s_tokens[s_token_pos];
-}
-
-static void error_unexpected_token(TokenType expected)
-{
-    // TODO
 }
 

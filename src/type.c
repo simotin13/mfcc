@@ -16,7 +16,7 @@ const Type c_types[] =
     {   6,   sizeof(double),    "double"    },
 };
 
-Type* type_new(char* name, int size)
+Type* type_new(const char* name, int size)
 {
     // TODO must set hash value
     Type *t = malloc(sizeof(Type));

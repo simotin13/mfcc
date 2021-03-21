@@ -23,7 +23,7 @@ typedef struct {
     char name[256];
 } Type;
 extern const Type c_types[];
-Type* type_new(char* name, int size);
+Type* type_new(const char* name, int size);
 extern bool is_same_type(Type* ty1, Type* ty2);
 
 #endif  // _TYPE_H_
