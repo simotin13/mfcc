@@ -1,4 +1,6 @@
 int main(void)
 {
-    return (1 + 3) * (3 * 2);
+    int result = 0;
+    result = add(1, 2);
+    return result;
 }
