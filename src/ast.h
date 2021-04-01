@@ -47,7 +47,8 @@ typedef struct {
 } Func;
 
 typedef enum {
-    STMT_TYPE_RETURN,
+    STMT_RETURN,
+    STMT_ASSIGN
 } StatementType;
 
 typedef struct {
@@ -95,7 +96,7 @@ typedef struct {
 
 typedef struct {
     AstNode* node;
-} StmtReturn;
+} ReturnStmt;
 
 typedef struct {
     StorageClass class;
@@ -107,7 +108,7 @@ typedef struct {
 
 typedef struct {
     Variable* var;
-    AstNode* ast;
+    AstNode* node;
 } AssignStmt;
 
 extern Program* program_new();
@@ -115,7 +116,8 @@ extern Stmt *stmt_new(StatementType type, void* ast);
 extern Func* func_new(FuncDecl* decl, FuncBody* body);
 extern Scope* scope_new(void);
 extern void scope_add_stmt(Scope* scope, Stmt* stmt);
-extern StmtReturn* stmt_new_stmt_return(AstNode* node);
+extern ReturnStmt* stmt_new_stmt_return(AstNode* node);
+extern AssignStmt* assign_stmt_new(AstNode* node);
 AstNode* node_new(NodeType type, void* entry);
 extern AstBinary* ast_binary_new(OperationType op, AstNode *lhs, AstNode *rhs);
 extern Term* term_new(TermType type, Type* ty, void* ast);

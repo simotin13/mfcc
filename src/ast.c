@@ -17,6 +17,11 @@ Stmt* stmt_new(StatementType type, void* ast)
     stmt->ast = ast;
     return stmt;
 }
+AssignStmt* assign_stmt_new(AstNode *node) {
+    AssignStmt* stmt = malloc(sizeof(AssignStmt));
+    stmt->node = node;
+    return stmt;
+}
 
 void scope_add_stmt(Scope* scope, Stmt* stmt)
 {
@@ -31,9 +36,9 @@ Func* func_new(FuncDecl* decl, FuncBody* body)
     return func;
 }
 
-StmtReturn* stmt_new_stmt_return(AstNode *node)
+ReturnStmt* stmt_new_stmt_return(AstNode *node)
 {
-    StmtReturn* stmt = malloc(sizeof(StmtReturn));
+    ReturnStmt* stmt = malloc(sizeof(ReturnStmt));
     stmt->node = node;
     return stmt;
 }

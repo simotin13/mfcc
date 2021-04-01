@@ -19,7 +19,7 @@ static int get_data_type_size(Type* ty, Vector* dataTypes);
 
 static int traverse_program(FILE* fp, Vector *dataTypes, Program* prgram);
 static int traverse_stmt(FILE* fp, FuncBody *funcBody, Vector *dataTypes, Stmt* stmt);
-static int traverse_return(FILE* fp, FuncBody *funcBody, StmtReturn* stmtReturn);
+static int traverse_return(FILE* fp, FuncBody *funcBody, ReturnStmt* stmtReturn);
 
 static int traverse_node(FILE *fp , AstNode *node);
 static int travarse_term(FILE* fp, Term* term);
@@ -101,11 +101,16 @@ static int traverse_program(FILE* fp, Vector *dataTypes, Program* program)
 
 static int traverse_stmt(FILE* fp, FuncBody *funcBody, Vector *dataTypes, Stmt* stmt)
 {
-    StmtReturn* returnStmt;
+    ReturnStmt* returnStmt;
+    AssignStmt* assignStmt;
     switch (stmt->type) {
-    case STMT_TYPE_RETURN:
-        returnStmt = (StmtReturn*)stmt->ast;
+    case STMT_RETURN:
+        returnStmt = (ReturnStmt*)stmt->ast;
         traverse_return(fp, funcBody, returnStmt);
+        break;
+    case STMT_ASSIGN:
+        assignStmt = (AssignStmt*)stmt->ast;
+        // TODO
         break;
     default:
         break;
@@ -223,7 +228,7 @@ static void write_asm_with_indent(FILE* fp, char *fmt, ...)
     return;
 }
 
-static int traverse_return(FILE *fp, FuncBody* body, StmtReturn *stmtReturn) {
+static int traverse_return(FILE *fp, FuncBody* body, ReturnStmt *stmtReturn) {
     int ret;
     // generate exp
     AstNode* node = stmtReturn->node;

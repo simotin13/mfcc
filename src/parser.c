@@ -23,11 +23,13 @@ static int parse_declare_specifier(DeclType *declType, void **decl);
 static int parse_function_args(Vector *args);
 static int parse_function_body(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
 static int parse_local_variables(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
+static int parse_function_call(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
 static int parse_assign_or_function_call(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
+static int parse_function_call_args(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
 static int parse_variable(Variable** var);
 static Integer* ast_int_new(long val);
-static int parse_return_stmt(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Token* t, StmtReturn** stmtReturn);
-static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *tLhs, AstNode **nodeTop);
+static int parse_return_stmt(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, ReturnStmt** stmtReturn);
+static int parse_arg_expression(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, AstNode** node);
 static int parse_expression(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, AstNode** nodeTop);
 
 static int find_var(Vector* vars, char* name);
@@ -243,7 +245,7 @@ static int parse_function_body(Vector *globalVars, FuncDecl* funcDecl, FuncBody 
     int ret;
     Token* t = cur_token();
     Stmt* stmt;
-    StmtReturn* stmtReturn;
+    ReturnStmt* stmtReturn;
 
     while (true) {
         bResult = is_token_type(t, T_CLOSE_BRACE);
@@ -261,18 +263,18 @@ static int parse_function_body(Vector *globalVars, FuncDecl* funcDecl, FuncBody 
         // check assign stmt
 
         // check function call
-        parse_function_call(globalVars, funcDecl, funcBody);
+        parse_assign_or_function_call(globalVars, funcDecl, funcBody);
 
         // check return
         t = cur_token();
         bResult = is_token_type(t, T_RETURN);
         if (bResult) {
             t = consume();
-            ret = parse_return_stmt(globalVars, funcDecl, funcBody, t, &stmtReturn);
+            ret = parse_return_stmt(globalVars, funcDecl, funcBody, &stmtReturn);
             if (ret != 0) {
                 return -1;
             }
-            stmt = stmt_new(STMT_TYPE_RETURN, stmtReturn);
+            stmt = stmt_new(STMT_RETURN, stmtReturn);
             scope_add_stmt(funcBody->scope, stmt);
         }
         t = consume();
@@ -305,13 +307,21 @@ static int parse_local_variables(Vector *globalVars, FuncDecl *funcDecl, FuncBod
         t = consume();
         bResult = is_token_type(t, T_EQUAL);
         if (bResult) {
+            consume();
+
             // assign
-            t = consume();
-            ret = parse_assign_stmt(globalVars, funcDecl, funcBody, t, &node);
+            ret = parse_expression(globalVars, funcDecl, funcBody, &node);
             if (ret != 0) {
                 return -1;
             }
-            var->initialAssign = node;            
+
+            t = cur_token();
+            bResult = is_token_type(t, T_SEMICOLON);
+            if (bResult != true) {
+                return -1;
+            }
+            consume();
+            var->initialAssign = node;
         } else {
             // local variable declare
             bResult = is_token_type(t, T_SEMICOLON);
@@ -332,6 +342,7 @@ static int parse_assign_or_function_call(Vector* globalVars, FuncDecl* funcDecl,
     bool bResult;
     AstNode* node;
     int ret;
+    AssignStmt* assignStmt;
 
     identifier = cur_token();
 
@@ -346,18 +357,82 @@ static int parse_assign_or_function_call(Vector* globalVars, FuncDecl* funcDecl,
         bResult = is_token_type(t, T_OPEN_PAREN);
         if (bResult) {
             // must be function call
-        } else {
-            bResult = is_token_type(t, T_EQUAL);
-            if (bResult) {
-                // must be assign stmt
-                ret = parse_assign_stmt(globalVars, funcDecl, funcBody, identifier, &node);
-            }
-            else {
+            // TODO
+            parse_function_call(globalVars, funcDecl, funcBody);
+        }
+        bResult = is_token_type(t, T_EQUAL);
+        if (bResult) {
+            t = consume();
+            ret = parse_expression(globalVars, funcDecl, funcBody, &node);
+            if (ret != 0) {
                 return -1;
             }
+            t = cur_token();
+            bResult = is_token_type(t, T_SEMICOLON);
+            if (bResult != true) {
+                return -1;
+            }
+
+            assignStmt = assign_stmt_new(node);
+            vec_push(funcBody->scope->stmts, stmt_new(STMT_ASSIGN, assignStmt));
+            // must be assign stmt
+            // ret = parse_assign_stmt(globalVars, funcDecl, funcBody, identifier, &node);
+            // TODO
+            return -1;
         }
         t = consume();
     }
+}
+
+static int parse_function_call(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody) {
+    Token* t;
+    bool bResult;
+    int ret;
+    while (true) {
+
+        ret = parse_function_call_args(globalVars, funcDecl, funcBody);
+        if (ret != 0) {
+            return -1;
+        }
+
+        t = cur_token();
+        bResult = is_token_type(t, T_SEMICOLON);
+        if (bResult) {
+            consume();
+            break;
+        }
+    }
+    return 0;
+}
+
+static int parse_function_call_args(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody) {
+    Token* t;
+    int result;
+    bool bResult;
+    AstNode* arg;
+        
+    while (true) {
+        t = cur_token();
+        result = parse_arg_expression(globalVars, funcDecl, funcBody, &arg);
+        if (result != 0) {
+            return -1;
+        }
+
+        t = cur_token();
+        bResult = is_token_type(t, T_COMMA);
+        if (bResult) {
+            consume();
+            continue;
+        }
+
+        bResult = is_token_type(t, T_CLOSE_PAREN);
+        if (bResult) {
+            consume();
+            break;
+        }
+        return -1;
+    }
+    return 0;
 }
 
 static Integer *ast_int_new(long val)
@@ -367,27 +442,20 @@ static Integer *ast_int_new(long val)
     return ast;
 }
 
-static int parse_assign_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token* tLhs, AstNode** nodeTop)
-{
-    int ret;
-    ret = parse_expression(globalVars, funcDecl, funcBody, nodeTop);
-    return ret;
-}
-
 typedef enum {
     NONE,
     WAIT_TERM,
     WAIT_OPERATOR,
 } ParseExpStatus;
 
-static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody, AstNode **node)
+static int parse_arg_expression(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, AstNode** node)
 {
     Token* t;
     AstBinary* astBin;
     Term* term = NULL;
-    AstNode *tmp = NULL;
-    AstNode *lhs = NULL;
-    AstNode *rhs = NULL;
+    AstNode* tmp = NULL;
+    AstNode* lhs = NULL;
+    AstNode* rhs = NULL;
     OperationType opStack[32] = { 0 };
     OperationType op;
     AstNode* nodeStack[32] = { 0 };
@@ -396,6 +464,110 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
     int nest = 0;
     while (true) {
         t = cur_token();
+
+        if (is_token_type(t, T_IDENTIFIER)) {
+            t = consume();
+            if (is_token_type(t, T_OPEN_PAREN)) {
+                consume();
+                parse_function_call(globalVars, funcDecl, funcBody);
+            }
+        }
+
+        if (is_token_type(t, T_OPEN_PAREN)) {
+            nest++;
+            consume();
+            continue;
+        }
+        if (is_token_type(t, T_CLOSE_PAREN)) {
+            nest--;
+            if (nest < 0) {
+                return -1;
+            }
+            if (0 < opPos) {
+                opPos--;
+                op = opStack[opPos];
+
+                nodePos--;
+                rhs = nodeStack[nodePos];
+
+                nodePos--;
+                lhs = nodeStack[nodePos];
+
+                astBin = ast_binary_new(op, lhs, rhs);
+                nodeStack[nodePos] = node_new(NODE_BINARY, astBin);
+                nodePos++;
+            }
+            consume();
+            continue;
+        }
+        if (is_operator(t, &op)) {
+            opStack[opPos] = op;
+            opPos++;
+            consume();
+            continue;
+        }
+        if (is_term(globalVars, funcDecl, funcBody, t, &term)) {
+            nodeStack[nodePos] = node_new(NODE_TERM, term);
+            nodePos++;
+
+            t = consume();
+            if (is_token_type(t, T_COMMA)) {
+                break;
+            }
+            if (is_token_type(t, T_CLOSE_PAREN)) {
+                break;
+            }
+            return -1;
+        }
+
+        return -1;
+    }
+
+    while (0 < opPos) {
+        opPos--;
+        op = opStack[opPos];
+        nodePos--;
+        tmp = nodeStack[nodePos];
+        rhs = node_new(tmp->type, tmp->entry);
+
+        nodePos--;
+        tmp = nodeStack[nodePos];
+        lhs = node_new(tmp->type, tmp->entry);
+
+        astBin = ast_binary_new(op, lhs, rhs);
+        nodeStack[nodePos] = node_new(NODE_BINARY, astBin);
+        nodePos++;
+    }
+
+    *node = nodeStack[0];
+    return 0;
+}
+
+static int parse_expression(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, AstNode** node)
+{
+    Token* t;
+    AstBinary* astBin;
+    Term* term = NULL;
+    AstNode* tmp = NULL;
+    AstNode* lhs = NULL;
+    AstNode* rhs = NULL;
+    OperationType opStack[32] = { 0 };
+    OperationType op;
+    AstNode* nodeStack[32] = { 0 };
+    int opPos = 0;
+    int nodePos = 0;
+    int nest = 0;
+    while (true) {
+        t = cur_token();
+
+        if (is_token_type(t, T_IDENTIFIER)) {
+            t = consume();
+            if (is_token_type(t, T_OPEN_PAREN)) {
+                consume();
+                parse_function_call(globalVars, funcDecl, funcBody);
+            }
+        }
+
         if (is_token_type(t, T_OPEN_PAREN)) {
             nest++;
             consume();
@@ -435,11 +607,7 @@ static int parse_expression(Vector *globalVars, FuncDecl* funcDecl, FuncBody* fu
             consume();
             continue;
         }
-
-        if (is_token_type(t, T_SEMICOLON)) {
-            consume();
-            break;
-        }
+        break;
     }
 
     while (0 < opPos) {
@@ -526,11 +694,22 @@ static bool is_operator(Token* t, OperationType *op)
     return false;
 }
 
-static int parse_return_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, Token *t, StmtReturn **stmtReturn)
+static int parse_return_stmt(Vector *globalVars, FuncDecl *funcDecl, FuncBody *funcBody, ReturnStmt **stmtReturn)
 {
     int result = 0;
+    bool bResult;
     AstNode* node;
+    Token* t;
+    t = cur_token();
     result = parse_expression(globalVars, funcDecl, funcBody, &node);
+    if (result != 0) {
+        return -1;
+    }
+    t = cur_token();
+    bResult = is_token_type(t, T_SEMICOLON);
+    if (bResult != true) {
+        return -1;
+    }
     *stmtReturn = stmt_new_stmt_return(node);
     return result;
 }
