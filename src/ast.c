@@ -17,9 +17,15 @@ Stmt* stmt_new(StatementType type, void* ast)
     stmt->ast = ast;
     return stmt;
 }
-AssignStmt* assign_stmt_new(AstNode *node) {
+AssignStmt* assign_stmt_new(Variable *var, AstNode *node) {
     AssignStmt* stmt = malloc(sizeof(AssignStmt));
+    stmt->var = var;
     stmt->node = node;
+    return stmt;
+}
+FuncCallStmt* func_call_stmt_new(AstFuncCall* funcCall) {
+    FuncCallStmt* stmt = malloc(sizeof(FuncCallStmt));
+    stmt->funcCall = funcCall;
     return stmt;
 }
 
@@ -72,6 +78,14 @@ AstBinary* ast_binary_new(OperationType op, AstNode* lhs, AstNode* rhs)
     ast->lhs = lhs;
     ast->rhs = rhs;
     return ast;
+}
+
+AstFuncCall* fanc_call_new(char* funcName, Vector* args) {
+    AstFuncCall* funcCall;
+    funcCall = malloc(sizeof(AstFuncCall));
+    strcpy(funcCall->fancName, funcName);
+    funcCall->args = args;
+    return funcCall;
 }
 
 AstBinary* ast_binary_set_elements(AstBinary *ast, OperationType op, AstNode *lhs, AstNode *rhs)

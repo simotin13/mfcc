@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <stdarg.h>
 #include <string.h>
+#include <assert.h>
 
 #include "codegen.h"
 #include "type.h"
@@ -18,20 +19,21 @@ static void initialize_data_type_size(Vector *types);
 static int get_data_type_size(Type* ty, Vector* dataTypes);
 
 static int traverse_program(FILE* fp, Vector *dataTypes, Program* prgram);
-static int traverse_stmt(FILE* fp, FuncBody *funcBody, Vector *dataTypes, Stmt* stmt);
-static int traverse_return(FILE* fp, FuncBody *funcBody, ReturnStmt* stmtReturn);
-
-static int traverse_node(FILE *fp , AstNode *node);
-static int travarse_term(FILE* fp, Term* term);
-static int travarse_binary(FILE* fp, AstBinary* binary);
-
+static int traverse_stmt(FILE* fp, Vector *globalVars, Func *func, Vector *dataTypes, Stmt* stmt);
+static int traverse_return(FILE* fp, Vector* globalVars, Func *func, ReturnStmt* stmtReturn);
+static int traverse_node(FILE *fp, Vector* globalVars, Func *func, AstNode *node);
+static int travarse_term(FILE* fp, Vector *globalVars, Func *func, Term* term);
+static int travarse_binary(FILE* fp, Vector* globalVars, Func* func, AstBinary* binary);
+static int traverse_assign(FILE* fp, Vector* globalVars, Func* body, AssignStmt* assignStmt);
+static int traverse_func_call(FILE* fp, Vector* globalVars, Func* body, FuncCallStmt* stmtFuncCall);
 static void write_asm_with_indent(FILE* fp, char* fmt, ...);
 static void write_prologue(FILE* fp);
 static void write_epilogue(FILE* fp, int frameSize);
 static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *allocSize);
 static void write_initial_value(FILE* fp, Vector* dataTypes, Vector* vars, Variable* var);
 
-static int get_rbp_offset_var(Vector* vars, Variable* var, int* offset);
+static int get_local_var_rbp_offset(Vector* vars, Variable* var, int* offset);
+static int get_arg_var_rbp_offset(Vector* vars, Variable* var, int* offset);
 
 #define BUILD_DIR   "build"
 
@@ -76,43 +78,55 @@ static int traverse_program(FILE* fp, Vector *dataTypes, Program* program)
 {
     int i, j;
     Func* func;
-    FuncBody* funcBody;
     Vector* stmts;
     Stmt* stmt;
     int allocSize;
 
+    // write function label
+    for (i = 0; i < program->funcs->size; i++) {
+        func = (Func*)program->funcs->data[i];
+        fprintf(fp, "global %s\n", func->decl->name);
+    }
+    fprintf(fp, "\n");
+
     for (i = 0; i < program->funcs->size; i++) {
         func = (Func *)program->funcs->data[i];
-        funcBody = func->body;
-        fprintf(fp, "global %s\n", func->decl->name);
-        fprintf(fp, "\n");
         fprintf(fp, "%s:\n", func->decl->name);
         write_prologue(fp);
         write_local_vars(fp, dataTypes, func->body->scope->vars, &allocSize);
-        stmts = funcBody->scope->stmts;
+        stmts = func->body->scope->stmts;
         for (j = 0; j < stmts->size; j++) {
-            stmt = (Stmt *)stmts->data[i];
-            traverse_stmt(fp, funcBody, dataTypes, stmt);
+            stmt = (Stmt *)stmts->data[j];
+            traverse_stmt(fp, program->vars, func, dataTypes, stmt);
         }
         write_epilogue(fp, allocSize);
+        fprintf(fp, "\n");
     }
     return 0;
 }
 
-static int traverse_stmt(FILE* fp, FuncBody *funcBody, Vector *dataTypes, Stmt* stmt)
+static int traverse_stmt(FILE* fp, Vector *globalVars, Func *func, Vector *dataTypes, Stmt* stmt)
 {
     ReturnStmt* returnStmt;
     AssignStmt* assignStmt;
+    FuncCallStmt* funcCallStmt;
     switch (stmt->type) {
     case STMT_RETURN:
-        returnStmt = (ReturnStmt*)stmt->ast;
-        traverse_return(fp, funcBody, returnStmt);
+        returnStmt = (ReturnStmt *)stmt->ast;
+        traverse_return(fp, globalVars, func, returnStmt);
         break;
     case STMT_ASSIGN:
-        assignStmt = (AssignStmt*)stmt->ast;
+        assignStmt = (AssignStmt *)stmt->ast;
+        traverse_assign(fp, globalVars, func, assignStmt);
         // TODO
         break;
+    case STMT_FUNC_CALL:
+        funcCallStmt = (FuncCallStmt *)stmt->ast;
+        traverse_func_call(fp, globalVars, func, funcCallStmt);
+        break;
     default:
+        // not implemented
+        assert(0);
         break;
     }
     return 0;
@@ -194,7 +208,7 @@ static void write_initial_value(FILE *fp, Vector *dataTypes, Vector *vars, Varia
     int offset;
     // TODO types 
     if (strcmp(var->ty->name, "int") == 0) {
-        get_rbp_offset_var(vars, var, &offset);
+        get_local_var_rbp_offset(vars, var, &offset);
         // TODO generate expression
 #if 0
         astInt = (Integer *)var->iVal;
@@ -228,43 +242,110 @@ static void write_asm_with_indent(FILE* fp, char *fmt, ...)
     return;
 }
 
-static int traverse_return(FILE *fp, FuncBody* body, ReturnStmt *stmtReturn) {
+static int traverse_func_call(FILE* fp, Vector* globalVars, Func* func, FuncCallStmt* stmtFuncCall) {
+    int i;
+    Vector *args = stmtFuncCall->funcCall->args;
+    AstNode* node;
+    Term* term;
+    Integer* integer;
+    for (i = args->size - 1; 0 <= i; i--) {
+        node = args->data[i];
+        switch (node->type) {
+        case NODE_TERM:
+            term = node->entry;
+            if (term->termType == TermLiteral) {
+                integer = (Integer*)term->ast;
+                write_asm_with_indent(fp, "push %d", integer->val);
+            }
+            break;
+        default:
+            assert(0);
+            break;
+        }
+    }
+    write_asm_with_indent(fp, "call %s", stmtFuncCall->funcCall->fancName);
+    return 0;
+}
+static int traverse_return(FILE *fp, Vector* globalVars, Func* body, ReturnStmt *stmtReturn) {
     int ret;
     // generate exp
     AstNode* node = stmtReturn->node;
-    ret = traverse_node(fp, node);
+    ret = traverse_node(fp, globalVars, body, node);
     write_asm_with_indent(fp, "pop rax");
     return ret;
 }
+static int traverse_assign(FILE* fp, Vector *globalVars, Func* func, AssignStmt* assignStmt) {
+    Variable* var = assignStmt->var;
+    int offset;
+    int ret;
+    if (strcmp(var->ty->name, "int") == 0) {
+        ret = get_local_var_rbp_offset(func->body->scope->vars, var, &offset);
+        if (ret != 0) {
+            return -1;
+        }
+        switch (assignStmt->node->type) {
+        default:
+            assert(0);
+        }
+        //TOOD
+       // write_asm_with_indent(fp, "mov DWORD [rbp - 0x%d], 0x%d", offset, astInt->val);
+    }
 
-static int traverse_node(FILE *fp, AstNode *node)
+
+    return 0;
+}
+
+static int traverse_node(FILE *fp, Vector* glovalVars, Func* func, AstNode *node)
 {
     Term* term;
     AstBinary* bin;
     switch (node->type) {
     case NODE_TERM:
         term = node->entry;
-        travarse_term(fp, term);
+        travarse_term(fp, glovalVars, func, term);
         break;
     case NODE_BINARY:
         bin = node->entry;
-        travarse_binary(fp, bin);
+        travarse_binary(fp, glovalVars, func, bin);
         break;
     }
     return 0;
 }
 
-static int travarse_term(FILE* fp, Term* term)
+static int travarse_term(FILE* fp, Vector *glovalVars, Func *func, Term* term)
 {
+    int ret;
+    int offset;
     Integer* integer;
+    Variable* var;
     switch (term->termType) {
     case TermLiteral:
         integer = (Integer *)term->ast;
         write_asm_with_indent(fp ,"mov rax, 0x%02X", integer->val);
         write_asm_with_indent(fp, "push rax");
         break;
-    case TermVariable:
-        // TODO
+    case TermArgVariable:
+        var = (Variable *)term->ast;
+        ret = get_arg_var_rbp_offset(func->decl->args, var, &offset);
+        if (ret < 0) {
+            assert(0);
+            return -1;
+        }
+        // TODO type
+        write_asm_with_indent(fp, "mov rax, [rbp + 0x%X]", offset);
+        write_asm_with_indent(fp, "push rax");
+        break;
+    case TermLocalVariable:
+        var = (Variable*)term->ast;
+        ret = get_local_var_rbp_offset(func->body->scope->vars, var, &offset);
+        if (ret < 0) {
+            assert(0);
+            return -1;
+        }
+        assert(0);
+        break;
+    case TermGlobalVariable:
+        assert(0);
         break;
     default:
         return -1;
@@ -273,10 +354,10 @@ static int travarse_term(FILE* fp, Term* term)
     return 0;
 }
 
-static int travarse_binary(FILE *fp, AstBinary* binary)
+static int travarse_binary(FILE *fp, Vector *globalVars, Func *func, AstBinary* binary)
 {
-    traverse_node(fp, binary->lhs);
-    traverse_node(fp, binary->rhs);
+    traverse_node(fp, globalVars, func, binary->lhs);
+    traverse_node(fp, globalVars, func, binary->rhs);
 
     switch (binary->op)
     {
@@ -304,7 +385,7 @@ static int travarse_binary(FILE *fp, AstBinary* binary)
     return 0;
 }
 
-static int get_rbp_offset_var(Vector* vars, Variable* var, int *offset)
+static int get_local_var_rbp_offset(Vector* vars, Variable* var, int *offset)
 {
     int i;
     Variable* tmp;
@@ -312,6 +393,22 @@ static int get_rbp_offset_var(Vector* vars, Variable* var, int *offset)
     for (i = 0; i < vars->size; i++) {
         tmp = vars->data[i];
         *offset -= tmp->ty->size;
+        if (strcmp(tmp->name, var->name) == 0) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static int get_arg_var_rbp_offset(Vector* args, Variable* var, int* offset)
+{
+    int i;
+    Variable* tmp;
+    *offset = 8;
+    for (i = args->size - 1;  0 <= i; i--) {
+        tmp = args->data[i];
+        *offset += tmp->ty->size * 2;
         if (strcmp(tmp->name, var->name) == 0) {
             return i;
         }

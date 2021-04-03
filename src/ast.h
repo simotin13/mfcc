@@ -14,7 +14,9 @@ typedef enum {
 
 typedef enum {
     TermLiteral,
-    TermVariable
+    TermArgVariable,
+    TermLocalVariable,
+    TermGlobalVariable,
 } TermType;
 
 // ============================================================================
@@ -48,7 +50,8 @@ typedef struct {
 
 typedef enum {
     STMT_RETURN,
-    STMT_ASSIGN
+    STMT_ASSIGN,
+    STMT_FUNC_CALL
 } StatementType;
 
 typedef struct {
@@ -61,9 +64,15 @@ typedef struct {
     void* ast;
 } Term;
 
+typedef struct {
+    char fancName[256];
+    Vector *args;
+} AstFuncCall;
+
 typedef enum {
     NODE_TERM,
     NODE_BINARY,
+    NODE_FUNC_CALL,
 } NodeType;
 
 typedef enum {
@@ -99,6 +108,10 @@ typedef struct {
 } ReturnStmt;
 
 typedef struct {
+    AstFuncCall* funcCall;
+} FuncCallStmt;
+
+typedef struct {
     StorageClass class;
     int pointer_level;
     Type *ty;
@@ -117,10 +130,12 @@ extern Func* func_new(FuncDecl* decl, FuncBody* body);
 extern Scope* scope_new(void);
 extern void scope_add_stmt(Scope* scope, Stmt* stmt);
 extern ReturnStmt* stmt_new_stmt_return(AstNode* node);
-extern AssignStmt* assign_stmt_new(AstNode* node);
+extern FuncCallStmt* func_call_stmt_new(AstFuncCall* funcCall);
+extern AssignStmt* assign_stmt_new(Variable *var, AstNode* node);
 AstNode* node_new(NodeType type, void* entry);
 extern AstBinary* ast_binary_new(OperationType op, AstNode *lhs, AstNode *rhs);
 extern Term* term_new(TermType type, Type* ty, void* ast);
 extern Variable* variable_new(char* name, StorageClass class, Type* ty, int pointer_level);
+extern AstFuncCall* fanc_call_new(char* funcName, Vector* args);
 
 #endif // _AST_H_
