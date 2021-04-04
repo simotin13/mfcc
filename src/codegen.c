@@ -25,7 +25,7 @@ static int traverse_node(FILE *fp, Vector* globalVars, Func *func, AstNode *node
 static int travarse_term(FILE* fp, Vector *globalVars, Func *func, Term* term);
 static int travarse_binary(FILE* fp, Vector* globalVars, Func* func, AstBinary* binary);
 static int traverse_assign(FILE* fp, Vector* globalVars, Func* body, AssignStmt* assignStmt);
-static int traverse_func_call(FILE* fp, Vector* globalVars, Func* body, FuncCallStmt* stmtFuncCall);
+static int traverse_func_call(FILE* fp, Vector* globalVars, Func* body, AstFuncCall* stmtFuncCall);
 static void write_asm_with_indent(FILE* fp, char* fmt, ...);
 static void write_prologue(FILE* fp);
 static void write_epilogue(FILE* fp, int frameSize);
@@ -122,7 +122,7 @@ static int traverse_stmt(FILE* fp, Vector *globalVars, Func *func, Vector *dataT
         break;
     case STMT_FUNC_CALL:
         funcCallStmt = (FuncCallStmt *)stmt->ast;
-        traverse_func_call(fp, globalVars, func, funcCallStmt);
+        traverse_func_call(fp, globalVars, func, funcCallStmt->funcCall);
         break;
     default:
         // not implemented
@@ -242,9 +242,9 @@ static void write_asm_with_indent(FILE* fp, char *fmt, ...)
     return;
 }
 
-static int traverse_func_call(FILE* fp, Vector* globalVars, Func* func, FuncCallStmt* stmtFuncCall) {
+static int traverse_func_call(FILE* fp, Vector* globalVars, Func* func, AstFuncCall* funcCall) {
     int i;
-    Vector *args = stmtFuncCall->funcCall->args;
+    Vector *args = funcCall->args;
     AstNode* node;
     Term* term;
     Integer* integer;
@@ -263,29 +263,34 @@ static int traverse_func_call(FILE* fp, Vector* globalVars, Func* func, FuncCall
             break;
         }
     }
-    write_asm_with_indent(fp, "call %s", stmtFuncCall->funcCall->fancName);
+    write_asm_with_indent(fp, "call %s", funcCall->fancName);
     return 0;
 }
-static int traverse_return(FILE *fp, Vector* globalVars, Func* body, ReturnStmt *stmtReturn) {
-    int ret;
+static int traverse_return(FILE *fp, Vector* globalVars, Func* func, ReturnStmt *stmtReturn) {
+    int ret = 0;
     // generate exp
     AstNode* node = stmtReturn->node;
-    ret = traverse_node(fp, globalVars, body, node);
+    traverse_node(fp, globalVars, func, node);
     write_asm_with_indent(fp, "pop rax");
     return ret;
 }
 static int traverse_assign(FILE* fp, Vector *globalVars, Func* func, AssignStmt* assignStmt) {
-    Variable* var = assignStmt->var;
+    AstNode* node;
+    Variable* var;
     int offset;
     int ret;
+    node = (AstNode *)assignStmt->node;
+    var = assignStmt->var;
     if (strcmp(var->ty->name, "int") == 0) {
+        ret = traverse_node(fp, globalVars, func, node);
+
+        // TODO Type
+        // local var is negative offset
         ret = get_local_var_rbp_offset(func->body->scope->vars, var, &offset);
         if (ret != 0) {
             return -1;
         }
-        // TODO Type
-        write_asm_with_indent(fp, "mov rax, [rbp - 0x%X]", offset);
-        write_asm_with_indent(fp, "push rax");
+        write_asm_with_indent(fp, "mov [rbp - 0x%X], rax", offset);
         //TOOD
        // write_asm_with_indent(fp, "mov DWORD [rbp - 0x%d], 0x%d", offset, astInt->val);
     }
@@ -306,6 +311,9 @@ static int traverse_node(FILE *fp, Vector* glovalVars, Func* func, AstNode *node
         bin = node->entry;
         travarse_binary(fp, glovalVars, func, bin);
         break;
+    case NODE_FUNC_CALL:
+        traverse_func_call(fp, glovalVars, func, (AstFuncCall*)node->entry);
+        break;
     }
     return 0;
 }
@@ -316,6 +324,8 @@ static int travarse_term(FILE* fp, Vector *glovalVars, Func *func, Term* term)
     int offset;
     Integer* integer;
     Variable* var;
+    
+    // TODO data type check
     switch (term->termType) {
     case TermLiteral:
         integer = (Integer *)term->ast;
@@ -329,7 +339,6 @@ static int travarse_term(FILE* fp, Vector *glovalVars, Func *func, Term* term)
             assert(0);
             return -1;
         }
-        // TODO type
         write_asm_with_indent(fp, "mov rax, [rbp + 0x%X]", offset);
         write_asm_with_indent(fp, "push rax");
         break;
@@ -340,7 +349,8 @@ static int travarse_term(FILE* fp, Vector *glovalVars, Func *func, Term* term)
             assert(0);
             return -1;
         }
-        assert(0);
+        write_asm_with_indent(fp, "mov rax, [rbp - 0x%X]", offset);
+        write_asm_with_indent(fp, "push rax");
         break;
     case TermGlobalVariable:
         assert(0);
@@ -387,10 +397,9 @@ static int get_local_var_rbp_offset(Vector* vars, Variable* var, int *offset)
 {
     int i;
     Variable* tmp;
-    *offset = 0;
     for (i = 0; i < vars->size; i++) {
         tmp = vars->data[i];
-        *offset -= tmp->ty->size;
+        *offset = tmp->ty->size;
         if (strcmp(tmp->name, var->name) == 0) {
             return i;
         }
