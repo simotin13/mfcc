@@ -4,6 +4,7 @@ int add(int a, int b) {
 
 int main(void)
 {
-    add(1,2);
-    return 0;
+    int result;
+    result = add(1,2);
+    return result;
 }

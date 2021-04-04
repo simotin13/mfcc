@@ -335,6 +335,7 @@ static int parse_local_variables(Vector *globalVars, FuncDecl *funcDecl, FuncBod
             if (bResult != true) {
                 return -1;
             }
+            consume();
         }
         vec_push(funcBody->scope->vars, var);
     }
@@ -729,7 +730,7 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
         // return varible
         idx = find_var(funcBody->scope->vars, t->val);
         if (0 <= idx) {
-            var = funcDecl->args->data[idx];
+            var = funcBody->scope->vars->data[idx];
             *term = term_new(TermLocalVariable, var->ty, var);
             return true;
         }

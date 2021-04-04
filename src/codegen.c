@@ -283,14 +283,12 @@ static int traverse_assign(FILE* fp, Vector *globalVars, Func* func, AssignStmt*
         if (ret != 0) {
             return -1;
         }
-        switch (assignStmt->node->type) {
-        default:
-            assert(0);
-        }
+        // TODO Type
+        write_asm_with_indent(fp, "mov rax, [rbp - 0x%X]", offset);
+        write_asm_with_indent(fp, "push rax");
         //TOOD
        // write_asm_with_indent(fp, "mov DWORD [rbp - 0x%d], 0x%d", offset, astInt->val);
     }
-
 
     return 0;
 }
