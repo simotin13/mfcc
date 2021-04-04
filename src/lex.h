@@ -9,8 +9,9 @@
 // ============================================================================
 typedef enum
 {
-    T_INTEGER = 0,
-    T_HEX_VALUE,
+    T_DEC_NUMBER_LITERAL = 0,
+    T_HEX_NUMBER_LITERAL,
+    T_FLOAT_NUMBER_LITERAL,
     T_PLUS,
     T_MINUS,
     T_SLASH,

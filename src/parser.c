@@ -710,7 +710,7 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
     Variable* var = NULL;
     int idx;
     Type* ty;
-    bResult = is_token_type(t, T_INTEGER);
+    bResult = is_token_type(t, T_DEC_NUMBER_LITERAL);
     if (bResult) {
         val = strtol(t->val, &endptr, 10);
         ty = (Type*)&(c_types[C_TYPES_IDX_INT]);

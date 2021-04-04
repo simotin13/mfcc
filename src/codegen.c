@@ -150,31 +150,6 @@ static void write_epilogue(FILE* fp, int frameSize)
     return;
 }
 
-#if 0
-static void write_function_args(FILE* fp, Vector *dataTypes, Func* func)
-{
-    int i;
-    int alloc_stack_size = 0;
-    Variable* arg;
-    for (i = 0; i < func->decl->args->size; i++) {
-        arg = func->decl->args->data[i];
-        alloc_stack_size  += get_data_type_size(arg->ty, dataTypes);
-    }
-
-    // alloc statck
-    if (0 < alloc_stack_size) {
-        write_asm_with_indent(fp, "sub rsp %d", alloc_stack_size);
-    }
-
-    // variable initialize
-    for (i = 0; i < func->decl->args->size; i++) {
-        arg = func->decl->args->data[i];
-        write_initial_value(fp, dataTypes, func->body->scope->vars, arg);
-    }
-    return;
-}
-#endif
-
 static void write_local_vars(FILE* fp, Vector* dataTypes, Vector* vars, int *allocSize)
 {
     int i;

@@ -22,7 +22,7 @@ typedef struct {
 static Token *get_token(char *pos, unsigned int *len, char **nextpos, int* errcode);
 static char* skip_space(char *pos, unsigned int *len);
 static Token* check_hex_number(char* pos, unsigned int* len, char** nextpos, int* errcode);
-static Token *check_dec_number(char* pos, unsigned int* len, char** nextpos, int* errcode);
+static Token* check_number(char* pos, unsigned int* len, char** nextpos, int* errcode);
 static Token *check_keyword_or_symbol(char *pos, unsigned int *len, char **nextpos, int* errcode);
 static Token *check_keyword(char* s);
 static Token *check_operator(char* code, unsigned int* len, char** nextpos, int* errcode);
@@ -117,12 +117,12 @@ static Token *get_token(char *pos, unsigned int *len, char **nextpos, int *errco
     Token *token = NULL;
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
 
-    token = check_hex_number(pos, len, nextpos, errcode);
+    token = check_number(pos, len, nextpos, errcode);
     if (token != NULL) {
         return token;
     }
 
-    token = check_dec_number(pos, len, nextpos, errcode);
+    token = check_hex_number(pos, len, nextpos, errcode);
     if (token != NULL) {
         return token;
     }
@@ -188,25 +188,41 @@ static Token* check_hex_number(char* pos, unsigned int* len, char** nextpos, int
     *errcode = 0;
     *nextpos = pos;
     *len = leftLen;
-    token = new_token(T_HEX_VALUE, sTmp);
+    token = new_token(T_HEX_NUMBER_LITERAL, sTmp);
     return token;
 }
 
-static Token *check_dec_number(char *pos, unsigned int *len, char **nextpos, int *errcode)
-{
-    Token *token = NULL;
-    unsigned int leftLen = *len;
+static Token* check_number(char* pos, unsigned int* len, char** nextpos, int* errcode) {
     char sTmp[STRING_MAX];
+    Token* token = NULL;
     unsigned int sLen = 0;
-    bool negative = false;
     memset(sTmp, 0, STRING_MAX);
-    
+    unsigned int leftLen = *len;
+    bool foundDecial = false;
+    TokenType ty = T_DEC_NUMBER_LITERAL;
     if (*pos == '-') {
-        negative = true;
+        // negative value
         pos++;
         leftLen--;
     }
 
+    if (*pos == '0') {
+        // must be followed by dot(.)
+        sTmp[sLen++] = *pos;
+        pos++;
+        leftLen--;
+
+        if (*pos != '.') {
+            *errcode = -1;
+            return NULL;
+        }
+
+        ty = T_FLOAT_NUMBER_LITERAL;
+        foundDecial = true;
+        sTmp[sLen++] = *pos;
+        pos++;
+        leftLen--;
+    }
     if ((*pos < '1') || ('9' < *pos)) {
         // not start with 1`9
         *errcode = -1;
@@ -216,14 +232,32 @@ static Token *check_dec_number(char *pos, unsigned int *len, char **nextpos, int
     sTmp[sLen++] = *pos;
     pos++;
     leftLen--;
-
-    while(0 < leftLen) {
+    while (0 < leftLen) {
         if (isdigit(*pos)) {
             sTmp[sLen++] = *pos;
             pos++;
             leftLen--;
+            continue;
         }
-        // TODO U, L postfix
+        if (*pos == '.') {
+            if (foundDecial) {
+                // decimal found more than once.
+                *errcode = -2;
+                return NULL;
+            }
+            ty = T_FLOAT_NUMBER_LITERAL;
+            foundDecial = true;
+            sTmp[sLen++] = *pos;
+            pos++;
+            leftLen--;
+            if (leftLen < 1) {
+                // not end with digit
+                *errcode = -3;
+                return NULL;
+            }
+            continue;
+        }
+
         if (isalpha(*pos)) {
             return NULL;
             *errcode = -2;
@@ -236,10 +270,12 @@ static Token *check_dec_number(char *pos, unsigned int *len, char **nextpos, int
     *len = leftLen;
 
     if (sLen) {
-        token = new_token(T_INTEGER, sTmp);
+        token = new_token(ty, sTmp);
     }
 
     return token;
+    return NULL;
+
 }
 
 static Token *check_keyword_or_symbol(char *pos, unsigned int *len, char **nextpos, int *errcode)
