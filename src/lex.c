@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-
+#include <stdbool.h>
 #include "gpcc.h"
 #include "lex.h"
 
@@ -19,13 +19,13 @@ typedef struct {
 // ============================================================================
 // prototype functions
 // ============================================================================
-static Token *get_token(char *pos, unsigned int *len, char **nextpos, int *errcode);
+static Token *get_token(char *pos, unsigned int *len, char **nextpos, int* errcode);
 static char* skip_space(char *pos, unsigned int *len);
 static Token* check_hex_number(char* pos, unsigned int* len, char** nextpos, int* errcode);
-static Token *check_dec_number(char *pos, unsigned int *len, char **nextpos, int *errcode);
-static Token *check_keyword_or_symbol(char *pos, unsigned int *len, char **nextpos, int *errcode);
-static Token *check_keyword(char *s);
-static Token *check_operator(char *code, unsigned int *len, char **nextpos, int *errcode);
+static Token *check_dec_number(char* pos, unsigned int* len, char** nextpos, int* errcode);
+static Token *check_keyword_or_symbol(char *pos, unsigned int *len, char **nextpos, int* errcode);
+static Token *check_keyword(char* s);
+static Token *check_operator(char* code, unsigned int* len, char** nextpos, int* errcode);
 static Token *new_token(TokenType type, char *val);
 
 KeywordsInfo s_keywords[KEYWORDS_MAX] =
@@ -149,29 +149,47 @@ static Token* check_hex_number(char* pos, unsigned int* len, char** nextpos, int
     unsigned int sLen = 0;
 
     if (leftLen < 3) {
+        *errcode = -1;
+        return NULL;
+    }
+    if (pos[0] != '0') {
+        *errcode = -1;
+        return NULL;
+    }
+    if (pos[1] != 'x') {
+        *errcode = -1;
         return NULL;
     }
 
-    if ((pos[0] == '0') && (pos[1] == 'x')) {
-        sTmp[0] = '0';
-        sTmp[1] = 'x';
-        leftLen -= 2;
-        pos += 2;
-        sLen += 2;
-        while (leftLen) {
-            if (isdigit(*pos) == 0) {
-                break;
-            }
+    sTmp[0] = '0';
+    sTmp[1] = 'x';
+    leftLen -= 2;
+    pos += 2;
+    sLen += 2;
+
+    while (leftLen) {
+        if (('0' <= *pos) || (*pos <= '9')) {
             sTmp[sLen] = *pos;
             pos++;
             sLen++;
             leftLen--;
         }
 
-        if (sLen) {
-            token = new_token(T_HEX_VALUE, sTmp);
+        if (('A' <= *pos) || (*pos <= 'F')) {
+            sTmp[sLen] = *pos;
+            pos++;
+            sLen++;
+            leftLen--;
         }
+        *errcode = -2;
+        return NULL;
     }
+
+    *errcode = 0;
+    *nextpos = pos;
+    *len = leftLen;
+    token = new_token(T_HEX_VALUE, sTmp);
+    return token;
 }
 
 static Token *check_dec_number(char *pos, unsigned int *len, char **nextpos, int *errcode)
@@ -180,19 +198,40 @@ static Token *check_dec_number(char *pos, unsigned int *len, char **nextpos, int
     unsigned int leftLen = *len;
     char sTmp[STRING_MAX];
     unsigned int sLen = 0;
-
+    bool negative = false;
     memset(sTmp, 0, STRING_MAX);
-
-    while(0 < leftLen) {
-         if (isdigit(*pos) == 0) {
-             break;
-         }
-         sTmp[sLen] = *pos;
-         pos++;
-         sLen++;
-         leftLen--;
+    
+    if (*pos == '-') {
+        negative = true;
+        pos++;
+        leftLen--;
     }
 
+    if ((*pos < '1') || ('9' < *pos)) {
+        // not start with 1`9
+        *errcode = -1;
+        return NULL;
+    }
+
+    sTmp[sLen++] = *pos;
+    pos++;
+    leftLen--;
+
+    while(0 < leftLen) {
+        if (isdigit(*pos)) {
+            sTmp[sLen++] = *pos;
+            pos++;
+            leftLen--;
+        }
+        // TODO U, L postfix
+        if (isalpha(*pos)) {
+            return NULL;
+            *errcode = -2;
+        }
+        break;
+    }
+
+    *errcode = 0;
     *nextpos = pos;
     *len = leftLen;
 
@@ -230,6 +269,7 @@ static Token *check_keyword_or_symbol(char *pos, unsigned int *len, char **nextp
         }
     }
 
+    *errcode = 0;
     *nextpos = pos;
     *len = leftLen;
 

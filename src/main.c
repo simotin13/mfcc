@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
     program = program_new();
     dataTypes = vec_new();
     for (i = 0; i < C_TYPES_LEN; i++) {
-        ty = type_new(c_types[i].name, c_types[i].size);
+        ty = type_new((char *)c_types[i].name, c_types[i].size);
         vec_push(dataTypes, ty);
     }
 

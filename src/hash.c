@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "hash.h"
+
 #define BACKET_SIZE         (4096)
 
 typedef struct _HASH_ENTRY {
@@ -13,10 +15,9 @@ static HASH_ENTRY hash_backet[BACKET_SIZE];
 
 #define FNV_PRIME_32        (1677619)
 #define FNV_OFFSET_32       (2166136261)
-static unsigned int hash(char *str)
+unsigned int hash(char *str)
 {
     // use FNV Hash Algorithm
-    int i;
     unsigned int h = FNV_PRIME_32;
     char* p = str;
     while(*p) {
