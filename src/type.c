@@ -22,6 +22,7 @@ Type* type_new(const char* name, int size)
     Type *t = malloc(sizeof(Type));
     strcpy(t->name, name);
     t->size = size;
+    t->hash = hash(name);
     return t;
 }
 bool is_same_type(Type* ty1, Type* ty2)

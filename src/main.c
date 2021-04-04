@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include "gpcc.h"
+#include "hash.h"
 #include "type.h"
 #include "vector.h"
 #include "lex.h"
@@ -57,6 +58,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "no input files.\n");
         exit(1);
     }
+
+    hash_init();
 
     tokens = vec_new();
     program = program_new();

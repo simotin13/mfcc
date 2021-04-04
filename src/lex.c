@@ -21,7 +21,8 @@ typedef struct {
 // ============================================================================
 static Token *get_token(char *pos, unsigned int *len, char **nextpos, int *errcode);
 static char* skip_space(char *pos, unsigned int *len);
-static Token *check_number(char *pos, unsigned int *len, char **nextpos, int *errcode);
+static Token* check_hex_number(char* pos, unsigned int* len, char** nextpos, int* errcode);
+static Token *check_dec_number(char *pos, unsigned int *len, char **nextpos, int *errcode);
 static Token *check_keyword_or_symbol(char *pos, unsigned int *len, char **nextpos, int *errcode);
 static Token *check_keyword(char *s);
 static Token *check_operator(char *code, unsigned int *len, char **nextpos, int *errcode);
@@ -70,10 +71,8 @@ int tokenize(char *code, unsigned int len, Vector *tokens)
     char *pos = code;
     char *nextpos;
     Token *token = NULL;
-    DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
 
     while(0 < leftLen) {
-        DPRINT(stdout, "scan loop, leftLen:[%d], *pos:[%c]\n", leftLen, *pos);
         pos = skip_space(pos, &leftLen);
         if (leftLen < 1) {
             break;
@@ -86,7 +85,6 @@ int tokenize(char *code, unsigned int len, Vector *tokens)
         }
     }
 
-    DPRINT(stdout, "%s:%d out...\n", __FUNCTION__, __LINE__);
     return result;
 }
 
@@ -119,7 +117,12 @@ static Token *get_token(char *pos, unsigned int *len, char **nextpos, int *errco
     Token *token = NULL;
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
 
-    token = check_number(pos, len, nextpos, errcode);
+    token = check_hex_number(pos, len, nextpos, errcode);
+    if (token != NULL) {
+        return token;
+    }
+
+    token = check_dec_number(pos, len, nextpos, errcode);
     if (token != NULL) {
         return token;
     }
@@ -138,18 +141,48 @@ static Token *get_token(char *pos, unsigned int *len, char **nextpos, int *errco
     return token;
 }
 
-static Token *check_number(char *pos, unsigned int *len, char **nextpos, int *errcode)
+static Token* check_hex_number(char* pos, unsigned int* len, char** nextpos, int* errcode)
+{
+    Token* token = NULL;
+    unsigned int leftLen = *len;
+    char sTmp[STRING_MAX];
+    unsigned int sLen = 0;
+
+    if (leftLen < 3) {
+        return NULL;
+    }
+
+    if ((pos[0] == '0') && (pos[1] == 'x')) {
+        sTmp[0] = '0';
+        sTmp[1] = 'x';
+        leftLen -= 2;
+        pos += 2;
+        sLen += 2;
+        while (leftLen) {
+            if (isdigit(*pos) == 0) {
+                break;
+            }
+            sTmp[sLen] = *pos;
+            pos++;
+            sLen++;
+            leftLen--;
+        }
+
+        if (sLen) {
+            token = new_token(T_HEX_VALUE, sTmp);
+        }
+    }
+}
+
+static Token *check_dec_number(char *pos, unsigned int *len, char **nextpos, int *errcode)
 {
     Token *token = NULL;
     unsigned int leftLen = *len;
     char sTmp[STRING_MAX];
     unsigned int sLen = 0;
 
-    DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
-
     memset(sTmp, 0, STRING_MAX);
 
-    // TODO Hex, Oct format string
     while(0 < leftLen) {
          if (isdigit(*pos) == 0) {
              break;
@@ -164,12 +197,9 @@ static Token *check_number(char *pos, unsigned int *len, char **nextpos, int *er
     *len = leftLen;
 
     if (sLen) {
-    	printf("%s!\n", sTmp);
         token = new_token(T_INTEGER, sTmp);
-    	DPRINT(stdout, "sTmp:[%s]\n", sTmp);
     }
 
-    DPRINT(stdout, "%s:%d out...\n", __FUNCTION__, __LINE__);
     return token;
 }
 
