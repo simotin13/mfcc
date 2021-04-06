@@ -1,4 +1,4 @@
-TARGET=gpcc
+TARGET=mfcc
 
 CFLAGS=-Wall -g
 
