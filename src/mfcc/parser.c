@@ -417,23 +417,9 @@ static int parse_assign_or_function_call(Vector* globalVars, FuncDecl* funcDecl,
         }
         return -1;
     }
-}
 
-#if 0
-static int parse_function_call(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, char *funcName, AstFuncCall **funcCall) {
-    Token* t;
-    bool bResult;
-    int ret;
-    Vector* args = vec_new();
-    ret = parse_function_call_args(globalVars, funcDecl, funcBody, args);
-    if (ret != 0) {
-        return -1;
-    }
-
-    *funcCall = fanc_call_new(funcName, args);
-    return 0;
+    return -1;
 }
-#endif
 
 static int parse_function_call_args(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Vector *args) {
     Token* t;
