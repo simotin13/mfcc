@@ -2,8 +2,9 @@
 *.pdb
 *.log
 *.tlog
-vs2019/*/Debug/*
-vs2019/.vs/*
-vs2019/x64/Debug/*
+vs2019/mfcc-toolchain/*/Debug/*
+vs2019/mfcc-toolchain/.vs/*
+vs2019/mfcc-toolchain/x64/Debug/*
+vs2019/mfcc-toolchain/Debug/*
 
 
