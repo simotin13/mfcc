@@ -390,7 +390,12 @@ static int get_arg_var_rbp_offset(Vector* args, Variable* var, int* offset)
     *offset = 8;
     for (i = args->size - 1;  0 <= i; i--) {
         tmp = args->data[i];
-        *offset += tmp->ty->size * 2;
+#if 0
+        *offset += tmp->ty->size;
+#else
+        // push args as int(64bit)
+        *offset += 8;
+#endif
         if (strcmp(tmp->name, var->name) == 0) {
             return i;
         }

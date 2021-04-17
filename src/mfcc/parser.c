@@ -24,9 +24,6 @@ static int parse_declare_specifier(DeclType *declType, void **decl);
 static int parse_function_args(Vector *args);
 static int parse_function_body(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
 static int parse_local_variables(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
-#if 0
-static int parse_function_call(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, char *funcName, AstFuncCall **funcCall);
-#endif
 static int parse_assign_or_function_call(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
 static int parse_function_call_args(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Vector *args);
 static int parse_variable(Variable** var);
@@ -106,22 +103,10 @@ static int parse_toplevel(Program* program)
             func = func_new(funcDecl, funcBody);
             vec_push(program->funcs, func);
         }
-        #if 0
-        result = declare_function(&varInfo);
-        if (result == 0) {
-            // var found
-            DPRINT(stdout,
-                "variable found scope:[%d}, DataType:[%d] pointer:[%d], symbol:[%s] in...\n",
-                varInfo.scope, varInfo.dt, varInfo.ptr, varInfo.sym);
-            continue;
-        }
-        #endif
-
     }
 
     DPRINT(stdout, "%s:%d out...\n", __FUNCTION__, __LINE__);
 
-    // TODO
     return 0;
 }
 static int parse_declare_specifier(DeclType *declType, void **decl) {
@@ -413,12 +398,13 @@ static int parse_assign_or_function_call(Vector* globalVars, FuncDecl* funcDecl,
                 lhs = (Variable*)globalVars->data[idx];
                 assignStmt = assign_stmt_new(lhs, node);
                 vec_push(funcBody->scope->stmts, stmt_new(STMT_ASSIGN, assignStmt));
+                break;
             }
         }
         return -1;
     }
 
-    return -1;
+    return 0;
 }
 
 static int parse_function_call_args(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody, Vector *args) {

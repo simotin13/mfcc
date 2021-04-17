@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include <assert.h>
 
-#include "gpcc.h"
+#include "mfcc.h"
 #include "hash.h"
 #include "type.h"
 #include "vector.h"

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdbool.h>
-#include "gpcc.h"
+#include "mfcc.h"
 #include "lex.h"
 
 #define KEYWORDS_MAX    (32)
