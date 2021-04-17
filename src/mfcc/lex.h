@@ -1,7 +1,7 @@
 #ifndef _LEX_H_
 #define _LEX_H_
 
-#include "gpcc.h"
+#include "mfcc.h"
 #include "vector.h"
 
 // ============================================================================
