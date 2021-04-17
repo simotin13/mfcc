@@ -1,9 +1,9 @@
 #!/bin/bash
-cd ../src
+cd ../src/mfcc
 make
-cd ../test
-cp ../src/gpcc .
-./gpcc test.c
+cd ../../test
+cp ../src/mfcc/mfcc .
+./mfcc test.c
 nasm -f elf64 ./tmp.s
 gcc ./tmp.o
 ./a.out
