@@ -1,3 +1,6 @@
+static int hoge = 1;
+static int foo  = 2;
+
 int add(int a, int b) {
     return a + b;
 }
