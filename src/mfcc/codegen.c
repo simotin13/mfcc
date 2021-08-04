@@ -328,7 +328,9 @@ static int travarse_term(FILE* fp, Vector *glovalVars, Func *func, Term* term)
         write_asm_with_indent(fp, "push rax");
         break;
     case TermGlobalVariable:
-        assert(0);
+		// TODO 
+		// assert(0);
+		write_asm_with_indent(fp, "mov edx, DWORD PTR[rip + 0x00000000]");
         break;
     default:
         return -1;
