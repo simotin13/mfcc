@@ -50,7 +50,6 @@ int generate_binary(char *filename, Vector* types, Program *program, BuildTarget
         exit(1);
     }
 
-    fprintf(fp, "section .text\n");
     traverse_program(fp, types, program);
 
     fclose(fp);
@@ -78,14 +77,32 @@ static int traverse_program(FILE* fp, Vector *dataTypes, Program* program)
 {
     int i, j;
     Func* func;
+    Variable* variable;
     Vector* stmts;
     Stmt* stmt;
     int allocSize;
 
+    // write data section
+    fprintf(fp, "section .data\n");
+    for (i = 0; i < program->vars->size; i++) {
+        variable = (Variable*)program->vars->data[i];
+        AstNode *node = variable->initialAssign;
+        Term *term = node->entry;
+        if (term->termType == TermLiteral) {
+            Integer *integer = term->ast;
+            write_asm_with_indent(fp, "%s dd 0x%X", variable->name, integer->val);
+        }
+
+    }
+    fprintf(fp, "\n");
+
+    // write text section
+    fprintf(fp, "section .text\n");
     // write function label
+
     for (i = 0; i < program->funcs->size; i++) {
         func = (Func*)program->funcs->data[i];
-        fprintf(fp, "global %s\n", func->decl->name);
+        write_asm_with_indent(fp, "global %s", func->decl->name);
     }
     fprintf(fp, "\n");
 
@@ -330,7 +347,7 @@ static int travarse_term(FILE* fp, Vector *glovalVars, Func *func, Term* term)
     case TermGlobalVariable:
 		// TODO 
 		// assert(0);
-		write_asm_with_indent(fp, "mov edx, DWORD PTR[rip + 0x00000000]");
+		//write_asm_with_indent(fp, "mov edx, DWORD PTR[rip + 0x00000000]");
         break;
     default:
         return -1;

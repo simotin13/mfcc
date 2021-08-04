@@ -20,7 +20,7 @@ typedef enum {
 // prototype functions
 // ============================================================================
 static int parse_toplevel(Program* program);
-static int parse_declare_specifier(DeclType *declType, void **decl);
+static int parse_declare(DeclType *declType, void **decl);
 static int parse_function_args(Vector *args);
 static int parse_function_body(Vector *globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
 static int parse_local_variables(Vector* globalVars, FuncDecl* funcDecl, FuncBody* funcBody);
@@ -77,7 +77,6 @@ static int parse_toplevel(Program* program)
     int result = 0;
     DeclType declType;
     Func* func = NULL;
-    Vector* globalVars = vec_new();
     FuncDecl* funcDecl = NULL;
     FuncBody* funcBody = NULL;
     void* decl = NULL;
@@ -85,18 +84,18 @@ static int parse_toplevel(Program* program)
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
 
     while(s_token_pos < s_token_len) {
-        result = parse_declare_specifier(&declType, &decl);
+        result = parse_declare(&declType, &decl);
         if (result != 0) {
             return -1;
         }
         if (declType == DECL_TYPE_VAR) {
-			vec_push(globalVars, decl);
+			vec_push(program->vars, decl);
         } else if (declType == DECL_TYPE_FUNCTION_PROTOTYPE) {
             // TODO
         } else if (declType == DECL_TYPE_FUNCTION_BODY) {
             funcDecl = decl;
             funcBody = func_body_new();
-            result = parse_function_body(globalVars, funcDecl, funcBody);
+            result = parse_function_body(program->vars, funcDecl, funcBody);
             if (result != 0) {
                 return -1;
             }
@@ -109,7 +108,7 @@ static int parse_toplevel(Program* program)
 
     return 0;
 }
-static int parse_declare_specifier(DeclType *declType, void **decl) {
+static int parse_declare(DeclType *declType, void **decl) {
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
     bool bResult;
     int result;
