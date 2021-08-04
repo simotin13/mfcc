@@ -90,7 +90,7 @@ static int parse_toplevel(Program* program)
             return -1;
         }
         if (declType == DECL_TYPE_VAR) {
-            // TODO
+			vec_push(globalVars, decl);
         } else if (declType == DECL_TYPE_FUNCTION_PROTOTYPE) {
             // TODO
         } else if (declType == DECL_TYPE_FUNCTION_BODY) {
@@ -176,18 +176,32 @@ static int parse_declare_specifier(DeclType *declType, void **decl) {
         }
     } else {
         // should be a var delare
-        t = consume();
-        result = is_token_type(t, T_EQUAL);
+		*declType = DECL_TYPE_VAR;
+		Variable *var = variable_new(sym->val, class, type, 0);
+
+		result = is_token_type(t, T_EQUAL);
         if (result) {
-            // var declare with initial value
-        }
-        result = is_token_type(t, T_SEMICOLON);
-        if (result) {
-            // var delare;
-            *declType = DECL_TYPE_VAR;
-            *decl = variable_new(sym->val, class, type, 0);
-            return 0;
-        }
+			// global variable declare with assign
+			AstNode* node;
+			consume();
+
+			// var declare with initial value
+			// TODO shoulde be constant value but call parse_declare_specifier..
+			int ret = parse_expression(NULL, NULL, NULL, &node);
+			if (ret != 0) {
+				return -1;
+			}
+
+			t = cur_token();
+			var->initialAssign = node;
+		}
+		result = is_token_type(t, T_SEMICOLON);
+		if (result != true) {
+			return -1;
+		}
+		consume();
+
+		*decl = var;
     }
 
     DPRINT(stdout, "%s:%d out...\n", __FUNCTION__, __LINE__);
@@ -699,14 +713,22 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
             return true;
         }
 
-        // return varible
+        // local varible
         idx = find_var(funcBody->scope->vars, t->val);
         if (0 <= idx) {
             var = funcBody->scope->vars->data[idx];
             *term = term_new(TermLocalVariable, var->ty, var);
             return true;
         }
-    }
+
+		// search global vars
+		idx = find_var(globalVars, t->val);
+		if (0 <= idx) {
+			var = funcDecl->args->data[idx];
+			*term = term_new(TermGlobalVariable, var->ty, var);
+			return true;
+		}
+	}
 
     return false;
 }
