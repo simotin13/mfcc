@@ -82,6 +82,9 @@ static int traverse_program(FILE* fp, Vector *dataTypes, Program* program)
     Stmt* stmt;
     int allocSize;
 
+    // need for PIC
+    fprintf(fp, "default rel\n");
+
     // write data section
     fprintf(fp, "section .data\n");
     for (i = 0; i < program->vars->size; i++) {
@@ -90,9 +93,8 @@ static int traverse_program(FILE* fp, Vector *dataTypes, Program* program)
         Term *term = node->entry;
         if (term->termType == TermLiteral) {
             Integer *integer = term->ast;
-            write_asm_with_indent(fp, "%s dd 0x%X", variable->name, integer->val);
+            write_asm_with_indent(fp, "%s dq 0x%X", variable->name, integer->val);
         }
-
     }
     fprintf(fp, "\n");
 
@@ -345,9 +347,9 @@ static int travarse_term(FILE* fp, Vector *glovalVars, Func *func, Term* term)
         write_asm_with_indent(fp, "push rax");
         break;
     case TermGlobalVariable:
-		// TODO 
-		// assert(0);
-		//write_asm_with_indent(fp, "mov edx, DWORD PTR[rip + 0x00000000]");
+        var = (Variable*)term->ast;
+		write_asm_with_indent(fp, "mov rax, [%s]", var->name);
+        write_asm_with_indent(fp, "push rax");
         break;
     default:
         return -1;

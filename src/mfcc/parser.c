@@ -191,8 +191,8 @@ static int parse_declare(DeclType *declType, void **decl) {
 				return -1;
 			}
 
-			t = cur_token();
-			var->initialAssign = node;
+            var->initialAssign = node;
+            t = cur_token();
 		}
 		result = is_token_type(t, T_SEMICOLON);
 		if (result != true) {
@@ -723,7 +723,7 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
 		// search global vars
 		idx = find_var(globalVars, t->val);
 		if (0 <= idx) {
-			var = funcDecl->args->data[idx];
+			var = globalVars->data[idx];
 			*term = term_new(TermGlobalVariable, var->ty, var);
 			return true;
 		}
