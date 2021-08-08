@@ -9,6 +9,14 @@
 #define KEYWORDS_MAX    (32)
 
 // ============================================================================
+// enum define
+// ============================================================================
+typedef enum {
+    WAIT_START_DOUBLE_QUOTE,
+    WAIT_END_DOUBLE_QUOTE,
+} STRING_CHECK_STATUS;
+
+// ============================================================================
 // struct define
 // ============================================================================
 typedef struct {
@@ -21,6 +29,7 @@ typedef struct {
 // ============================================================================
 static Token *get_token(char *pos, unsigned int *len, char **nextpos, int* errcode);
 static char* skip_space(char *pos, unsigned int *len);
+static Token* check_string(char* pos, unsigned int* len, char** nextpos, int* errcode);
 static Token* check_hex_number(char* pos, unsigned int* len, char** nextpos, int* errcode);
 static Token* check_number(char* pos, unsigned int* len, char** nextpos, int* errcode);
 static Token *check_keyword_or_symbol(char *pos, unsigned int *len, char **nextpos, int* errcode);
@@ -117,6 +126,10 @@ static Token *get_token(char *pos, unsigned int *len, char **nextpos, int *errco
     Token *token = NULL;
     DPRINT(stdout, "%s:%d in...\n", __FUNCTION__, __LINE__);
 
+    token = check_string(pos, len, nextpos, errcode);
+    if (token != NULL) {
+        return token;
+    }
     token = check_number(pos, len, nextpos, errcode);
     if (token != NULL) {
         return token;
@@ -192,6 +205,52 @@ static Token* check_hex_number(char* pos, unsigned int* len, char** nextpos, int
     return token;
 }
 
+static Token* check_string(char* pos, unsigned int* len, char** nextpos, int* errcode) {
+    unsigned int sLen = 0;
+    unsigned int leftLen = *len;
+    char sTmp[STRING_MAX];
+    Token* token = NULL;
+    STRING_CHECK_STATUS status = WAIT_END_DOUBLE_QUOTE;
+
+    if (*pos != '\"') {
+        *errcode = -1;
+        return NULL;
+    }
+
+    pos++;
+    leftLen--;
+    memset(sTmp, 0, STRING_MAX);
+
+    while (0 < len) {
+        switch (status)
+        {
+        case WAIT_END_DOUBLE_QUOTE:
+            if (*pos == '\"') {
+                pos++;
+                leftLen--;
+                *nextpos = pos;
+                *len = leftLen;
+                token = new_token(T_STRING_LITERAL, sTmp);
+                *errcode = 0;
+                return token;
+            }
+            else {
+                sTmp[sLen] = *pos;
+                sLen++;
+                pos++;
+                leftLen--;
+            }
+            continue;
+        default:
+            *errcode = -2;
+            return NULL;
+        }
+    }
+    
+    *errcode = -2;
+    return NULL;
+}
+
 static Token* check_number(char* pos, unsigned int* len, char** nextpos, int* errcode) {
     char sTmp[STRING_MAX];
     Token* token = NULL;
@@ -207,21 +266,27 @@ static Token* check_number(char* pos, unsigned int* len, char** nextpos, int* er
     }
 
     if (*pos == '0') {
-        // must be followed by dot(.)
         sTmp[sLen++] = *pos;
         pos++;
         leftLen--;
 
-        if (*pos != '.') {
-            *errcode = -1;
+        if (isdigit(*pos)) {
             return NULL;
+            *errcode = -2;
+        }
+        if (isalpha(*pos)) {
+            return NULL;
+            *errcode = -2;
         }
 
-        ty = T_FLOAT_NUMBER_LITERAL;
-        foundDecial = true;
-        sTmp[sLen++] = *pos;
-        pos++;
-        leftLen--;
+
+        // token is 0
+        token = new_token(ty, sTmp);
+        *errcode = 0;
+        *nextpos = pos;
+        *len = leftLen;
+        return token;
+
     }
     if ((*pos < '1') || ('9' < *pos)) {
         // not start with 1`9
