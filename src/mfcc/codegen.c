@@ -84,19 +84,22 @@ static int traverse_program(FILE* fp, Vector *dataTypes, Program* program)
 
     // need for PIC
     fprintf(fp, "default rel\n");
+    fprintf(fp, "\n");
 
     // write data section
-    fprintf(fp, "section .data\n");
-    for (i = 0; i < program->vars->size; i++) {
-        variable = (Variable*)program->vars->data[i];
-        AstNode *node = variable->initialAssign;
-        Term *term = node->entry;
-        if (term->termType == TermLiteral) {
-            Integer *integer = term->ast;
-            write_asm_with_indent(fp, "%s dq 0x%X", variable->name, integer->val);
+    if (0 < program->vars->size) {
+        fprintf(fp, "section .data\n");
+        for (i = 0; i < program->vars->size; i++) {
+            variable = (Variable*)program->vars->data[i];
+            AstNode* node = variable->initialAssign;
+            Term* term = node->entry;
+            if (term->termType == TermIntLiteral) {
+                Integer* integer = term->ast;
+                write_asm_with_indent(fp, "%s dq 0x%X", variable->name, integer->val);
+            }
         }
+        fprintf(fp, "\n");
     }
-    fprintf(fp, "\n");
 
     // write text section
     fprintf(fp, "section .text\n");
@@ -242,16 +245,27 @@ static int traverse_func_call(FILE* fp, Vector* globalVars, Func* func, AstFuncC
     AstNode* node;
     Term* term;
     Integer* integer;
+    AstString* string;
     for (i = args->size - 1; 0 <= i; i--) {
         node = args->data[i];
         switch (node->type) {
         case NODE_TERM:
             term = node->entry;
-            if (term->termType == TermLiteral) {
+            if (term->termType == TermIntLiteral)
+            {
                 integer = (Integer*)term->ast;
                 write_asm_with_indent(fp, "push %d", integer->val);
             }
-            break;
+            else if (term->termType == TermStringLiteral)
+            {
+                string = (AstString *)term->ast;
+                string->val;
+            }
+            else 
+            {
+                assert(0);
+                break;
+            }
         default:
             assert(0);
             break;
@@ -321,7 +335,7 @@ static int travarse_term(FILE* fp, Vector *glovalVars, Func *func, Term* term)
     
     // TODO data type check
     switch (term->termType) {
-    case TermLiteral:
+    case TermIntLiteral:
         integer = (Integer *)term->ast;
         write_asm_with_indent(fp ,"mov rax, 0x%02X", integer->val);
         write_asm_with_indent(fp, "push rax");

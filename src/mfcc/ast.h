@@ -13,7 +13,8 @@ typedef enum {
 } ExpType;
 
 typedef enum {
-    TermLiteral,
+    TermIntLiteral,
+    TermStringLiteral,
     TermArgVariable,
     TermLocalVariable,
     TermGlobalVariable,
@@ -57,6 +58,10 @@ typedef enum {
 typedef struct {
     int val;
 } Integer;
+
+typedef struct {
+    char val[256];
+} AstString;
 
 typedef struct {
     TermType termType;

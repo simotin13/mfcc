@@ -458,6 +458,13 @@ static Integer *ast_int_new(long val)
     ast->val = val;
     return ast;
 }
+static AstString* ast_string_new(char *str)
+{
+    AstString* ast = malloc(sizeof(AstString));
+    strcpy(ast->val, str);
+    // TODO size check
+    return ast;
+}
 
 typedef enum {
     NONE,
@@ -694,12 +701,18 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
     bool bResult;
     Variable* var = NULL;
     int idx;
-    Type* ty;
+    Type* ty = NULL;
     bResult = is_token_type(t, T_DEC_NUMBER_LITERAL);
     if (bResult) {
         val = strtol(t->val, &endptr, 10);
         ty = (Type*)&(c_types[C_TYPES_IDX_INT]);
-        *term = term_new(TermLiteral, ty, ast_int_new(val));
+        *term = term_new(TermIntLiteral, ty, ast_int_new(val));
+        return true;
+    }
+    bResult = is_token_type(t, T_STRING_LITERAL);
+    if (bResult) {
+        Type* ty = NULL;
+        *term = term_new(TermStringLiteral, ty, ast_string_new(t->val));
         return true;
     }
     bResult = is_token_type(t, T_IDENTIFIER);
