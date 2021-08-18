@@ -713,6 +713,9 @@ static bool is_term(Vector* globalVars, FuncDecl *funcDecl, FuncBody *funcBody, 
     if (bResult) {
         Type* ty = NULL;
         *term = term_new(TermStringLiteral, ty, ast_string_new(t->val));
+
+        // add literals
+        vec_push(funcBody->literals, *term);
         return true;
     }
     bResult = is_token_type(t, T_IDENTIFIER);

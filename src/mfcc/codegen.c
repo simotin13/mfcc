@@ -101,6 +101,21 @@ static int traverse_program(FILE* fp, Vector *dataTypes, Program* program)
         fprintf(fp, "\n");
     }
 
+    int lblIdx = 0;
+    for (i = 0; i < program->funcs->size; i++) {
+        fprintf(fp, "section .data\n");
+        Func* func = program->funcs->data[i];
+        for (j = 0; j < func->body->literals->size; j++) {
+            Term* term = func->body->literals->data[i];
+            if (term->termType == TermStringLiteral) {
+                AstString* str = term->ast;
+                write_asm_with_indent(fp, "lbl_%d db '%s', 0", lblIdx, str->val);
+                lblIdx++;
+            }
+        }
+        fprintf(fp, "\n");
+    }
+
     // write text section
     fprintf(fp, "section .text\n");
     // write function label
@@ -263,9 +278,9 @@ static int traverse_func_call(FILE* fp, Vector* globalVars, Func* func, AstFuncC
             }
             else 
             {
-                assert(0);
-                break;
+                //assert(0);
             }
+            break;
         default:
             assert(0);
             break;

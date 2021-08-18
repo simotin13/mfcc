@@ -16,5 +16,6 @@ FuncBody* func_body_new()
 {
     FuncBody* funcBody = malloc(sizeof(FuncBody));
     funcBody->scope = scope_new();
+    funcBody->literals = vec_new();
     return funcBody;
 }

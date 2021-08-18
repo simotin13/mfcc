@@ -42,6 +42,7 @@ typedef struct {
 
 typedef struct {
     Scope* scope;
+    Vector* literals;
 } FuncBody;
 
 typedef struct {
